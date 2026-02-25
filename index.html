@@ -17,7 +17,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .st-circle{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:2px solid var(--border);background:var(--border-lt);position:relative;z-index:2;transition:all .25s}
 .st-circle .dot{width:7px;height:7px;border-radius:50%;background:#ccc;transition:background .2s}
 .st.active .st-circle{border-color:var(--t1);background:var(--surface)}.st.active .st-circle .dot{background:var(--t1)}
-.st.done .st-circle{border-color:var(--t1);background:var(--t1)}.st.done .st-circle .dot{display:none}.st.done .st-circle::after{content:'✓';color:#fff;font-size:.65em;font-weight:700}
+.st.done .st-circle{border-color:var(--t1);background:var(--t1)}.st.done .st-circle .dot{display:none}.st.done .st-circle::after{content:'\2713';color:#fff;font-size:.65em;font-weight:700}
 .st-line{flex:1;height:2px;background:var(--border);margin:0 5px;transition:background .25s}.st.done .st-line{background:var(--t1)}.st:last-child .st-line{display:none}
 .st-label{font-size:.72em;font-weight:500;color:var(--t3);margin-top:6px;padding-left:2px}.st.active .st-label{color:var(--t1);font-weight:600}.st.done .st-label{color:var(--t2)}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:4px}
@@ -93,7 +93,7 @@ h1{font-size:1.4em;font-weight:600;letter-spacing:-.02em}
 .about-steps{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
 .about-step{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;font-size:.84em;color:var(--t2);line-height:1.55;border-top:1px solid var(--border-lt)}
 .about-step:first-child{border-top:none}
-.step-badge{font-size:.65em;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:4px;flex-shrink:0;min-width:42px;text-align:center;color:var(--t3);background:var(--border-lt);border:1px solid var(--border);line-height:1.5;margin-top:1px}
+.step-badge{font-size:.65em;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 0;border-radius:4px;flex-shrink:0;width:62px;text-align:center;color:var(--t3);background:var(--border-lt);border:1px solid var(--border);line-height:1.5;margin-top:1px}
 .about-github{text-align:center;margin-top:32px;margin-bottom:16px}
 .about-github a{display:inline-flex;align-items:center;justify-content:center;color:var(--t3);transition:color .15s}
 .about-github a:hover{color:var(--t2)}
@@ -105,8 +105,8 @@ h1{font-size:1.4em;font-weight:600;letter-spacing:-.02em}
   <div class="logo" id="logoBtn">Rollout Studio</div>
   <div class="stepper" id="stepper"></div>
   <div class="topbar-right">
-    <div class="lang-toggle" id="langToggle"><button class="active" data-l="en">EN</button><button data-l="es">ES</button></div>
     <button class="btn btn-ghost btn-sm" id="aboutBtn" style="font-size:.76em">About</button>
+    <div class="lang-toggle" id="langToggle"><button class="active" data-l="en">EN</button><button data-l="es">ES</button></div>
   </div>
 </div>
 <div class="main">
@@ -118,8 +118,8 @@ h1{font-size:1.4em;font-weight:600;letter-spacing:-.02em}
   <div class="page" id="pAbout"></div>
 </div>
 <div class="bottombar" id="bottombar">
-  <div><button class="btn btn-ghost" id="btnBack" style="visibility:hidden">\u2190 Back</button></div>
-  <div class="bb-right"><span class="bb-hint" id="hint"></span><button class="btn btn-dark" id="btnNext">Map Rims \u2192</button></div>
+  <div><button class="btn btn-ghost" id="btnBack" style="visibility:hidden">&larr; Back</button></div>
+  <div class="bb-right"><span class="bb-hint" id="hint"></span><button class="btn btn-dark" id="btnNext">Map Rims &rarr;</button></div>
 </div>
 <input type="file" id="fi" multiple accept="image/*,.json" style="display:none">
 
