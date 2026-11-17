@@ -31,6 +31,12 @@ Baseline (6 synthetic scenes, mean):
 
 On real photos the red-pixel rim scan often fails outright (e.g. the Met set, where the rims leave the image). Targets: rim error < 1% H (Phase 2), oracle angle error < 2° (Phase 3).
 
+## Status / handoff (latest)
+
+- App default rim detector: `RIM2.detect` (A2) in `js/core/rim-detect-v2.js`; the old one is the fallback in `js/steps/1-upload.js`.
+- Measure any change with `node scripts/eval.js` (needs `python3 scripts/fetch_test_sets.py` once). Use `--only "A2 two-class,..."` to keep the report readable; check real photos visually, since synthetic floor shadows are harsher than real ones.
+- Next steps: Phase 2 failures 2–4 below, then Phase 3 (perspective-correct unwarp using the fitted ellipses `b.topE`/`b.botE`, with `s` = top-rim curve direction). The oracle row's 12–15° error is the target to remove.
+
 ## Phase 2: automatic rim recognition
 
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
@@ -42,6 +48,7 @@ Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real
 | original (red-pixel scan) | 8.5 | 6.4 | fails outright on many real photos |
 | original + Snap | 7.3 | 5.2 | |
 | **A: silhouette (local border-colour model) + ellipse fit** | **1.5** | 8.0* | **winner, shipped** |
+| **A2: A + two-class mask (vessel colours vs background-or-shadow)** | **1.5** | **4.8** | **current default** |
 | A + Snap | 3.7 | 8.6 | Snap now makes rims *worse* |
 | C: A + edge search over ellipse params | 6.0 | 6.7 | locks onto painted bands |
 | D: bottom from where side edges end | 1.5 | 10.0 | fooled by floor horizon lines |
@@ -51,13 +58,15 @@ Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real
 
 Key pieces of A: the background is modelled from border pixels at similar rows/columns (backdrops are gradients); rims are ellipses (a projected circle is exactly an ellipse); the top rim's curve direction (camera above/below the rim) is decided from perspective geometry (the two rims' openness + separation must imply a plausible lens).
 
+A2 (`refineMask`): learns the vessel's colours from A's mask, then a pixel is vessel only if it is closer to a vessel colour than to the local background or a darkened (35–100%) copy of it. On real photos it ignores one-sided shadows (Sotheby's 2024) and finds the base on the pca and most Met dark-backdrop shots. Floor scenes: 17.5/19.7/30.4 → 7.0/16.6/16.6 (the remaining error is a synthetic black base band that is as dark as the shadow).
+
 Known failures, in priority order:
-1. Contact shadows / dark bases on dark backdrops: the silhouette includes the shadow or loses the base.
+1. ~~Contact shadows / dark bases on dark backdrops~~ mostly fixed by A2; still fails on 3 Met dark-backdrop shots.
 2. Light parts of the vessel on a white backdrop (Sotheby's 2023 bird vessel): the silhouette loses them.
 3. Very wide-angle close-ups: the "plausible lens" prior picks the wrong top-rim direction.
 4. Snap (old DP edge snap) degrades good rims: constrain it to ellipses or remove it.
 
-Likely next step for 1–2: a proper two-class segmentation (object colour model vs local background model, GrabCut-style) or a segmentation model; the rest of the pipeline stays the same.
+Next for 2 (white-on-white): colour alone can't separate them; use edges (the vessel outline is a continuous edge even where colours match), e.g. close the mask along strong gradients, or a segmentation model (SAM-class) if a cheap one is acceptable.
 
 ### Original plan
 

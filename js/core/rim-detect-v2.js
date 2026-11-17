@@ -60,6 +60,12 @@ var RIM2 = (function () {
   function silhouette(S) {
     var W = S.W, H = S.H, dist = bgDistance(S), th = Math.max(18, otsu(dist)), m = new Uint8Array(W * H), i;
     for (i = 0; i < W * H; i++) m[i] = dist[i] > th ? 1 : 0;
+    return cleanMask(m, W, H);
+  }
+
+  // Keep the component nearest the centre (weighted by size) and fill its holes.
+  function cleanMask(m, W, H) {
+    var i;
     // largest component (4-connected), preferring the one covering the image centre
     var lab = new Int32Array(W * H), stack = [], best = -1, bestScore = 0, n = 0;
     for (i = 0; i < W * H; i++) {
@@ -86,6 +92,52 @@ var RIM2 = (function () {
       if (px > 0) seed(p - 1); if (px < W - 1) seed(p + 1); if (py > 0) seed(p - W); if (py < H - 1) seed(p + W);
     }
     return out;
+  }
+
+  /* Two-class refinement (GrabCut-style): learn the vessel's own colours from the first mask, then
+     re-classify pixels around it. A pixel is vessel only if it is closer to a vessel colour than to
+     the local background or a darkened copy of it (a shadow: 35-100% of the background's brightness).
+     This removes contact shadows and recovers dark bases that merely resemble the backdrop. */
+  function refineMask(S, mask) {
+    var W = S.W, H = S.H, d = S.d, i, x, y, obj = [], x0 = W, x1 = 0, y0 = H, y1 = 0;
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (mask[y * W + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 <= x0) return mask;
+    // vessel colour samples: a grid over the mask, skipping its outer 3 px (edges mix with background)
+    var step = Math.max(2, Math.round(Math.sqrt(((x1 - x0) * (y1 - y0)) / 600)));
+    for (y = y0 + 3; y <= y1 - 3; y += step) for (x = x0 + 3; x <= x1 - 3; x += step) {
+      if (mask[y * W + x] && mask[y * W + x - 3] && mask[y * W + x + 3] && mask[(y - 3) * W + x] && mask[(y + 3) * W + x]) {
+        i = (y * W + x) * 4; obj.push([d[i], d[i + 1], d[i + 2]]);
+      }
+    }
+    if (obj.length < 20) return mask;
+    var m = 3, bs = Math.max(3, Math.round((2 * (W + H)) / 160)), side = [], tb = [];
+    function px(xx, yy) { var j = (yy * W + xx) * 4; return [d[j], d[j + 1], d[j + 2], xx, yy]; }
+    for (y = 0; y < H; y += bs) { side.push(px(m, y)); side.push(px(W - 1 - m, y)); }
+    for (x = 0; x < W; x += bs) { tb.push(px(x, m)); tb.push(px(x, H - 1 - m)); }
+    var out = new Uint8Array(mask), wy = 0.12 * H, edge = 0.25 * H;
+    var rx0 = Math.max(0, x0 - Math.round(0.1 * (x1 - x0))), rx1 = Math.min(W - 1, x1 + Math.round(0.1 * (x1 - x0)));
+    var ry0 = Math.max(0, y0 - 2), ry1 = Math.min(H - 1, y1 + Math.round(0.15 * (y1 - y0)));
+    for (y = ry0; y <= ry1; y++) {
+      var cand = side.filter(function (s) { return Math.abs(s[4] - y) <= wy; });
+      if (y < edge || y > H - edge) tb.forEach(function (s) { if (Math.abs(s[4] - y) <= edge) cand.push(s); });
+      for (x = rx0; x <= rx1; x++) {
+        i = (y * W + x) * 4;
+        var r = d[i], g = d[i + 1], b = d[i + 2], dB = 1e9, dO = 1e9, k, a, v;
+        for (k = 0; k < cand.length; k++) {
+          a = cand[k];
+          var t = (r * a[0] + g * a[1] + b * a[2]) / (a[0] * a[0] + a[1] * a[1] + a[2] * a[2] + 1);
+          t = t > 1 ? 1 : t < 0.35 ? 0.35 : t; // allow the background to be darkened (shadow), not brightened
+          var er = r - t * a[0], eg = g - t * a[1], eb = b - t * a[2];
+          v = er * er + eg * eg + eb * eb; if (v < dB) dB = v;
+        }
+        for (k = 0; k < obj.length && dO > 0; k++) {
+          a = obj[k]; var or = r - a[0], og = g - a[1], ob = b - a[2];
+          v = or * or + og * og + ob * ob; if (v < dO) dO = v;
+        }
+        out[y * W + x] = dO < dB ? 1 : 0;
+      }
+    }
+    return cleanMask(out, W, H);
   }
 
   function median(a) { var s = a.slice().sort(function (x, y) { return x - y; }); return s.length ? s[s.length >> 1] : 0; }
@@ -184,8 +236,11 @@ var RIM2 = (function () {
       topH: toHandles(top), botH: toHandles(bot), topE: top, botE: bot };
   }
 
-  function detect(cv) {
-    var S = small(cv), mask = silhouette(S), f = fitFromMask(mask, S.W, S.H), top = f.top, bot = f.bot;
+  function detect(cv, opts) {
+    opts = opts || {};
+    var S = small(cv), mask = silhouette(S);
+    if (opts.twoClass !== false) mask = refineMask(S, mask); // default on; {twoClass:false} = plain A
+    var f = fitFromMask(mask, S.W, S.H), top = f.top, bot = f.bot;
     if (!top || !bot) return null;
     top.s = cameraAboveTop(top, bot, S.H) ? 1 : -1;
     return toB(scaleE(top, S.sc), scaleE(bot, S.sc), f.yMin / S.sc, f.yMax / S.sc);

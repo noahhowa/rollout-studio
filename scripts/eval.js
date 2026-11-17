@@ -67,7 +67,7 @@ function summarize(cases) {
 function report(cases, summary, rollouts) {
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const sumRows = Object.entries(summary).map(([k, s]) =>
-    `<tr><td><span class="sw" style="background:${({ oracle: "#16a34a", baseline: "#f97316", "baseline+snap": "#2563eb", "A silhouette": "#db2777", "A+snap": "#7c3aed", "C silh+edges": "#0891b2", "D silh+sides": "#ca8a04", "E silh+sym": "#dc2626" })[k] || "#888"}"></span>${esc(k)}</td><td>${fmt(s.rimTopPct)}</td><td>${fmt(s.rimBotPct)}</td><td>${fmt(s.angDeg_0_30)}</td><td>${fmt(s.angDeg_30_60)}</td><td>${fmt(s.angDeg_60_90)}</td><td>${fmt(s.ms, 0)}</td></tr>`).join("");
+    `<tr><td><span class="sw" style="background:${({ oracle: "#16a34a", baseline: "#f97316", "baseline+snap": "#2563eb", "A silhouette": "#db2777", "A+snap": "#7c3aed", "A2 two-class": "#ca8a04", "C silh+edges": "#0891b2", "D silh+sides": "#ca8a04", "E silh+sym": "#dc2626" })[k] || "#888"}"></span>${esc(k)}</td><td>${fmt(s.rimTopPct)}</td><td>${fmt(s.rimBotPct)}</td><td>${fmt(s.angDeg_0_30)}</td><td>${fmt(s.angDeg_30_60)}</td><td>${fmt(s.angDeg_60_90)}</td><td>${fmt(s.ms, 0)}</td></tr>`).join("");
   const groups = [...new Set(cases.map((c) => c.group))];
   const sections = groups.map((g) => {
     const cs = cases.filter((c) => c.group === g);
@@ -97,7 +97,7 @@ table{border-collapse:collapse;font-variant-numeric:tabular-nums;width:100%;max-
 .rollout{max-width:100%;border-radius:4px;margin-bottom:8px}.err{color:#dc2626}.note{color:var(--mut);max-width:760px}
 </style></head><body>
 <h1>Rollout Studio eval</h1>
-<p class="note">Rims: <b style="color:#16a34a">green dashed</b> = truth (synthetic only), <b style="color:#f97316">orange</b> = original detector (red-pixel scan), <b style="color:#2563eb">blue</b> = baseline + Snap, <b style="color:#db2777">pink</b> = A silhouette (new default), <b style="color:#7c3aed">purple</b> = A + Snap. Strips are each pipeline's unwarp; "oracle" uses perfect rims, so its error is purely the unwarp's flat-projection model.</p>
+<p class="note">Rims: <b style="color:#16a34a">green dashed</b> = truth (synthetic only), <b style="color:#f97316">orange</b> = original detector (red-pixel scan), <b style="color:#2563eb">blue</b> = baseline + Snap, <b style="color:#db2777">pink</b> = A silhouette, <b style="color:#ca8a04">gold</b> = A2 two-class (app default), <b style="color:#7c3aed">purple</b> = A2 + Snap. Strips are each pipeline's unwarp; "oracle" uses perfect rims, so its error is purely the unwarp's flat-projection model.</p>
 <h2>Synthetic summary (mean over ${cases.filter((c) => c.group === "synthetic").length} scenes)</h2>
 <table><tr><th>pipeline</th><th>top rim err %H</th><th>bottom rim err %H</th><th>angle err 0–30°</th><th>30–60°</th><th>60–90°</th><th>ms</th></tr>${sumRows}</table>
 <p class="note">Rim error: mean vertical distance from the true rim, as % of vessel height. Angle error: median degrees between where the unwarp places content and where it truly is on the cylinder, by distance from the facing direction.</p>

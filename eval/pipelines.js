@@ -17,9 +17,11 @@ var PIPELINES = {
     snapRimToEdge(im, "bot");
     return b;
   },
-  // Current app default: silhouette + ellipse fit (js/core/rim-detect-v2.js)
-  "A silhouette": function (cv) { return RIM2.detect(cv); },
-  // A + Snap
+  // Silhouette + ellipse fit, without the two-class mask refinement
+  "A silhouette": function (cv) { return RIM2.detect(cv, { twoClass: false }); },
+  // Current app default: A + two-class (vessel colours vs background/shadow) mask refinement
+  "A2 two-class": function (cv) { return RIM2.detect(cv); },
+  // A2 + Snap
   "A+snap": function (cv) {
     var b = RIM2.detect(cv), im = { cv: cv, b: b };
     snapRimToEdge(im, "top");

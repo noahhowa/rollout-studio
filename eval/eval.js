@@ -70,7 +70,7 @@ function angularError(strip, tex, rot) {
   return errs.map(function (a) { return a.length ? med(a) : null; });
 }
 var COLORS = { truth: "#16a34a", baseline: "#f97316", "baseline+snap": "#2563eb", oracle: "#16a34a",
-  "A silhouette": "#db2777", "A+snap": "#7c3aed", "C silh+edges": "#0891b2", "D silh+sides": "#ca8a04", "E silh+sym": "#dc2626" };
+  "A silhouette": "#db2777", "A+snap": "#7c3aed", "A2 two-class": "#ca8a04", "C silh+edges": "#0891b2", "D silh+sides": "#ca8a04", "E silh+sym": "#dc2626" };
 var PALETTE = ["#f97316", "#2563eb", "#db2777", "#7c3aed", "#0891b2"];
 function colorFor(name, i) { return COLORS[name] || PALETTE[i % PALETTE.length]; }
 function toJpeg(cv, w) {
