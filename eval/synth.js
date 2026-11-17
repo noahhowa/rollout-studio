@@ -50,6 +50,10 @@ function renderCylinder(tex, p) {
         else if (y2 < 0) { d[k] = 90; d[k + 1] = 60; d[k + 2] = 40; hit = true; }
       }
     }
+    if (!hit && p.floor && dy < 0) { // floor plane at y=0 with a soft contact shadow
+      var tf = -C[1] / dy, fr = Math.hypot(C[0] + tf * dx, C[2] + tf * dz), sh = Math.min(1, Math.max(0.35, (fr - 0.95) / 0.8));
+      d[k] = p.floor[0] * sh; d[k + 1] = p.floor[1] * sh; d[k + 2] = p.floor[2] * sh; hit = true;
+    }
     if (!hit) { var g = 1 - 0.15 * (py / H); d[k] = bg[0] * g; d[k + 1] = bg[1] * g; d[k + 2] = bg[2] * g; }
   }
   ctx.putImageData(img, 0, 0);

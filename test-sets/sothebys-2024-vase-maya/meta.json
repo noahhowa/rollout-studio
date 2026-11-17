@@ -12,12 +12,13 @@
       "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/webnative/images/e7/0c/686c233b46c6a8f204261978e9a0/pf2408-cxhdy-t2-01.jpg"
     },
     {
-      "file": "photos/02.jpg",
+      "file": "details/02.jpg",
       "size": [
         1645,
         2000
       ],
-      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/webnative/images/3d/4f/d77a21c846019b1a182f20fc5e2c/pf2408-cxhdy-t2-04.jpg"
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/webnative/images/3d/4f/d77a21c846019b1a182f20fc5e2c/pf2408-cxhdy-t2-04.jpg",
+      "note": "close-up detail, not a full view: excluded from eval"
     },
     {
       "file": "photos/03.jpg",

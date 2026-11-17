@@ -3,16 +3,25 @@
    To try a new detector: add an entry here; it shows up as a new row in the report. */
 "use strict";
 var PIPELINES = {
-  // What the app does on upload.
+  // The original detector (red-pixel scan), kept as a reference.
   baseline: function (cv) {
     var b = detectBounds(cv);
     b.topH = initH(cv, b, "top");
     b.botH = initH(cv, b, "bot");
     return b;
   },
-  // Upload + pressing "Snap" in the Map step.
+  // Original + pressing "Snap" in the Map step.
   "baseline+snap": function (cv) {
     var b = PIPELINES.baseline(cv), im = { cv: cv, b: b };
+    snapRimToEdge(im, "top");
+    snapRimToEdge(im, "bot");
+    return b;
+  },
+  // Current app default: silhouette + ellipse fit (js/core/rim-detect-v2.js)
+  "A silhouette": function (cv) { return RIM2.detect(cv); },
+  // A + Snap
+  "A+snap": function (cv) {
+    var b = RIM2.detect(cv), im = { cv: cv, b: b };
     snapRimToEdge(im, "top");
     snapRimToEdge(im, "bot");
     return b;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Run every rim-detection pipeline (eval/pipelines.js) on synthetic cylinders and the real
    test sets, then write eval/out/report.html (visual, self-contained) and eval/out/scores.json.
-   Usage: node scripts/eval.js        (needs Playwright + Chromium; real sets need fetch_test_sets.py first) */
+   Usage: node scripts/eval.js [--only "name1,name2"]        (needs Playwright + Chromium; real sets need fetch_test_sets.py first) */
 const http = require("http"), fs = require("fs"), path = require("path");
 const { chromium } = require("playwright");
 const ROOT = path.resolve(__dirname, ".."), OUT = path.join(ROOT, "eval", "out");
@@ -13,6 +13,9 @@ const SYNTH = [
   { id: "warm-table", texture: "proc", dist: 4, elev: 30, bg: [205, 185, 150] },
   { id: "eye-level", texture: "proc", dist: 8, elev: 3 },
   { id: "high-angle", texture: "met", dist: 5, elev: 40, bg: [150, 150, 155] },
+  { id: "floor-grey", texture: "met", dist: 5, elev: 18, bg: [225, 225, 228], floor: [130, 130, 135] },
+  { id: "floor-wood", texture: "proc", dist: 7, elev: 25, bg: [60, 60, 65], floor: [150, 105, 70] },
+  { id: "floor-close", texture: "met", dist: 3.2, elev: 30, bg: [240, 240, 240], floor: [200, 200, 205] },
 ].map((p) => ({ W: 800, H: 1000, rot: 0, ...p, fov: (2 * Math.atan((1.2 * 2.4) / p.dist) * 180) / Math.PI }));
 
 function serve() {
@@ -50,20 +53,21 @@ function summarize(cases) {
     for (const r of c.results) {
       const s = (by[r.name] = by[r.name] || { rimTop: [], rimBot: [], ang: [[], [], []], ms: [] });
       if (r.rim) { s.rimTop.push(r.rim.top); s.rimBot.push(r.rim.bot); }
+      if (r.rimEllipse) { (s.eT = s.eT || []).push(r.rimEllipse.top); (s.eB = s.eB || []).push(r.rimEllipse.bot); }
       if (r.ang) r.ang.forEach((v, i) => v != null && s.ang[i].push(v));
       if (r.ms != null) s.ms.push(r.ms);
     }
   const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
   const out = {};
   for (const [k, s] of Object.entries(by))
-    out[k] = { rimTopPct: mean(s.rimTop), rimBotPct: mean(s.rimBot), angDeg_0_30: mean(s.ang[0]), angDeg_30_60: mean(s.ang[1]), angDeg_60_90: mean(s.ang[2]), ms: mean(s.ms) };
+    out[k] = { rimTopPct: mean(s.rimTop), rimBotPct: mean(s.rimBot), angDeg_0_30: mean(s.ang[0]), angDeg_30_60: mean(s.ang[1]), angDeg_60_90: mean(s.ang[2]), ms: mean(s.ms), ellTopPct: s.eT ? mean(s.eT) : null, ellBotPct: s.eB ? mean(s.eB) : null };
   return out;
 }
 
 function report(cases, summary, rollouts) {
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const sumRows = Object.entries(summary).map(([k, s]) =>
-    `<tr><td><span class="sw" style="background:${k === "oracle" ? "#16a34a" : k === "baseline" ? "#f97316" : "#2563eb"}"></span>${esc(k)}</td><td>${fmt(s.rimTopPct)}</td><td>${fmt(s.rimBotPct)}</td><td>${fmt(s.angDeg_0_30)}</td><td>${fmt(s.angDeg_30_60)}</td><td>${fmt(s.angDeg_60_90)}</td><td>${fmt(s.ms, 0)}</td></tr>`).join("");
+    `<tr><td><span class="sw" style="background:${({ oracle: "#16a34a", baseline: "#f97316", "baseline+snap": "#2563eb", "A silhouette": "#db2777", "A+snap": "#7c3aed", "C silh+edges": "#0891b2", "D silh+sides": "#ca8a04", "E silh+sym": "#dc2626" })[k] || "#888"}"></span>${esc(k)}</td><td>${fmt(s.rimTopPct)}</td><td>${fmt(s.rimBotPct)}</td><td>${fmt(s.angDeg_0_30)}</td><td>${fmt(s.angDeg_30_60)}</td><td>${fmt(s.angDeg_60_90)}</td><td>${fmt(s.ms, 0)}</td></tr>`).join("");
   const groups = [...new Set(cases.map((c) => c.group))];
   const sections = groups.map((g) => {
     const cs = cases.filter((c) => c.group === g);
@@ -93,7 +97,7 @@ table{border-collapse:collapse;font-variant-numeric:tabular-nums;width:100%;max-
 .rollout{max-width:100%;border-radius:4px;margin-bottom:8px}.err{color:#dc2626}.note{color:var(--mut);max-width:760px}
 </style></head><body>
 <h1>Rollout Studio eval</h1>
-<p class="note">Rims: <b style="color:#16a34a">green dashed</b> = truth (synthetic only), <b style="color:#f97316">orange</b> = baseline (auto on upload), <b style="color:#2563eb">blue</b> = baseline + Snap. Strips are each pipeline's unwarp; "oracle" uses perfect rims, so its error is purely the unwarp's flat-projection model.</p>
+<p class="note">Rims: <b style="color:#16a34a">green dashed</b> = truth (synthetic only), <b style="color:#f97316">orange</b> = original detector (red-pixel scan), <b style="color:#2563eb">blue</b> = baseline + Snap, <b style="color:#db2777">pink</b> = A silhouette (new default), <b style="color:#7c3aed">purple</b> = A + Snap. Strips are each pipeline's unwarp; "oracle" uses perfect rims, so its error is purely the unwarp's flat-projection model.</p>
 <h2>Synthetic summary (mean over ${cases.filter((c) => c.group === "synthetic").length} scenes)</h2>
 <table><tr><th>pipeline</th><th>top rim err %H</th><th>bottom rim err %H</th><th>angle err 0–30°</th><th>30–60°</th><th>60–90°</th><th>ms</th></tr>${sumRows}</table>
 <p class="note">Rim error: mean vertical distance from the true rim, as % of vessel height. Angle error: median degrees between where the unwarp places content and where it truly is on the cylinder, by distance from the facing direction.</p>
@@ -106,7 +110,7 @@ ${sections}</body></html>`;
   page.on("pageerror", (e) => console.error("page error:", e.message));
   await page.goto(`${base}/eval/harness.html`);
   const { cases: real, rollouts } = realCases();
-  const cases = await page.evaluate((job) => runEval(job), { synth: SYNTH, real, metRollout: "/test-sets/met-310364/rollout/02.jpg", metCrop: [0.065, 0.2, 0.935, 0.865] });
+  const cases = await page.evaluate((job) => runEval(job), { synth: SYNTH, real, only: (process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1].split(",") : null), metRollout: "/test-sets/met-310364/rollout/02.jpg", metCrop: [0.065, 0.2, 0.935, 0.865] });
   const roData = {};
   for (const [set, srcs] of Object.entries(rollouts))
     roData[set] = await page.evaluate(async (s) => Promise.all(s.map(async (u) => toJpeg(await loadCanvas(u), 1100))), srcs);

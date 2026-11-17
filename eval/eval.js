@@ -22,11 +22,16 @@ function oracleB(truth) {
   return { topH: t, botH: bo, cx: t[1].x, r: (t[2].x - t[0].x) / 2, xLeft: t[0].x, xRight: t[2].x, yTop: t[1].y, yBot: bo[1].y };
 }
 // Mean |error| of a pipeline's rims vs truth, in % of vessel height, over the middle 90% of the width.
+function ellH(e) { return { e: e }; } // marker: evaluate the ellipse itself, not its 3-handle approximation
+function rimAt(h, x) {
+  if (h.e) { var u = (x - h.e.xc) / h.e.a; return h.e.yc + (h.e.s || 1) * h.e.b * Math.sqrt(Math.max(0, 1 - u * u)); }
+  return evalRimCurve(h, x);
+}
 function rimError(b, truth) {
   var hgt = curveAt(truth.bot, truth.bot[truth.bot.length >> 1].x) - curveAt(truth.top, truth.top[truth.top.length >> 1].x);
   function one(h, pts) {
     var x0 = pts[0].x, x1 = pts[pts.length - 1].x, s = 0, n = 0;
-    for (var i = 0; i <= 50; i++) { var x = x0 + (x1 - x0) * (0.05 + 0.9 * i / 50); s += Math.abs(evalRimCurve(h, x) - curveAt(pts, x)); n++; }
+    for (var i = 0; i <= 50; i++) { var x = x0 + (x1 - x0) * (0.05 + 0.9 * i / 50); s += Math.abs(rimAt(h, x) - curveAt(pts, x)); n++; }
     return (100 * s) / n / hgt;
   }
   return { top: one(b.topH, truth.top), bot: one(b.botH, truth.bot) };
@@ -64,7 +69,8 @@ function angularError(strip, tex, rot) {
   }
   return errs.map(function (a) { return a.length ? med(a) : null; });
 }
-var COLORS = { truth: "#16a34a", baseline: "#f97316", "baseline+snap": "#2563eb", oracle: "#16a34a" };
+var COLORS = { truth: "#16a34a", baseline: "#f97316", "baseline+snap": "#2563eb", oracle: "#16a34a",
+  "A silhouette": "#db2777", "A+snap": "#7c3aed", "C silh+edges": "#0891b2", "D silh+sides": "#ca8a04", "E silh+sym": "#dc2626" };
 var PALETTE = ["#f97316", "#2563eb", "#db2777", "#7c3aed", "#0891b2"];
 function colorFor(name, i) { return COLORS[name] || PALETTE[i % PALETTE.length]; }
 function toJpeg(cv, w) {
@@ -75,7 +81,7 @@ function toJpeg(cv, w) {
 }
 function overlay(cv, results, truth) {
   var c = document.createElement("canvas"); c.width = cv.width; c.height = cv.height;
-  var x = c.getContext("2d"), lw = Math.max(2, cv.width / 250); x.drawImage(cv, 0, 0); x.lineWidth = lw;
+  var x = c.getContext("2d"), lw = Math.max(2, cv.width / 250); x.drawImage(cv, 0, 0); x.lineWidth = lw * 1.5;
   function poly(pts, col, dash) { x.strokeStyle = col; x.setLineDash(dash || []); x.beginPath(); pts.forEach(function (p, i) { i ? x.lineTo(p.x, p.y) : x.moveTo(p.x, p.y); }); x.stroke(); }
   if (truth) { poly(truth.top, COLORS.truth, [lw * 3, lw * 2]); poly(truth.bot, COLORS.truth, [lw * 3, lw * 2]); }
   results.forEach(function (r, i) {
@@ -99,14 +105,18 @@ function loadCanvas(src) {
     im.onerror = rej; im.src = src;
   });
 }
+var ONLY = null;
 function runPipelines(cv, truth, extra) {
   var out = [];
-  Object.keys(PIPELINES).forEach(function (name) {
+  Object.keys(PIPELINES).filter(function (n) { return !ONLY || ONLY.indexOf(n) >= 0; }).forEach(function (name) {
     var r = { name: name };
     try {
       var t0 = performance.now(); r.b = PIPELINES[name](cv); r.ms = Math.round(performance.now() - t0);
       r.strip = toJpeg(unwarp(cv, r.b), 500);
-      if (truth) { r.rim = rimError(r.b, truth); r.ang = angularError(unwarp(cv, r.b), extra.tex, extra.rot); }
+      if (truth) {
+        r.rim = rimError(r.b, truth); r.ang = angularError(unwarp(cv, r.b), extra.tex, extra.rot);
+        if (r.b.topE) r.rimEllipse = rimError({ topH: ellH(r.b.topE), botH: ellH(r.b.botE) }, truth, true);
+      }
     } catch (e) { r.error = String(e); }
     out.push(r);
   });
@@ -117,7 +127,7 @@ function runPipelines(cv, truth, extra) {
   return out;
 }
 window.runEval = async function (job) {
-  var cases = [];
+  var cases = []; ONLY = job.only || null;
   var met = null;
   try { // the published rollout has a grey margin around the vessel: crop to the painted surface
     var full = await loadCanvas(job.metRollout), cr = job.metCrop;

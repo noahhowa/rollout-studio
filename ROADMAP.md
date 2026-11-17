@@ -33,6 +33,34 @@ On real photos the red-pixel rim scan often fails outright (e.g. the Met set, wh
 
 ## Phase 2: automatic rim recognition
 
+### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
+
+Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):
+
+| approach | top | bottom | verdict |
+|---|---|---|---|
+| original (red-pixel scan) | 8.5 | 6.4 | fails outright on many real photos |
+| original + Snap | 7.3 | 5.2 | |
+| **A: silhouette (local border-colour model) + ellipse fit** | **1.5** | 8.0* | **winner, shipped** |
+| A + Snap | 3.7 | 8.6 | Snap now makes rims *worse* |
+| C: A + edge search over ellipse params | 6.0 | 6.7 | locks onto painted bands |
+| D: bottom from where side edges end | 1.5 | 10.0 | fooled by floor horizon lines |
+| E: bottom from mirror-symmetrised silhouette | 8.1 | 8.4 | rounded bases break it |
+
+\*A's bottom error is ~1% on the 6 scenes without a floor; the 3 floor scenes have very dark contact shadows (harsher than real studio shadows) that merge into the silhouette.
+
+Key pieces of A: the background is modelled from border pixels at similar rows/columns (backdrops are gradients); rims are ellipses (a projected circle is exactly an ellipse); the top rim's curve direction (camera above/below the rim) is decided from perspective geometry (the two rims' openness + separation must imply a plausible lens).
+
+Known failures, in priority order:
+1. Contact shadows / dark bases on dark backdrops: the silhouette includes the shadow or loses the base.
+2. Light parts of the vessel on a white backdrop (Sotheby's 2023 bird vessel): the silhouette loses them.
+3. Very wide-angle close-ups: the "plausible lens" prior picks the wrong top-rim direction.
+4. Snap (old DP edge snap) degrades good rims: constrain it to ellipses or remove it.
+
+Likely next step for 1–2: a proper two-class segmentation (object colour model vs local background model, GrabCut-style) or a segmentation model; the rest of the pipeline stays the same.
+
+### Original plan
+
 A circle seen by a pinhole camera is **exactly an ellipse**, which is the key structure to exploit.
 
 1. **Object silhouette without color assumptions.** In rough order of effort:

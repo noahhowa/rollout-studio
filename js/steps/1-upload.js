@@ -26,9 +26,14 @@ function loadSrc(src) {
     c.width = Math.round(im.width * sc);
     c.height = Math.round(im.height * sc);
     c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-    var b = detectBounds(c);
-    b.topH = initH(c, b, "top");
-    b.botH = initH(c, b, "bot");
+    // Silhouette + ellipse rim detection; fall back to the original red-pixel scan if it fails.
+    var b = null;
+    try { b = RIM2.detect(c); } catch (e) { b = null; }
+    if (!b) {
+      b = detectBounds(c);
+      b.topH = initH(c, b, "top");
+      b.botH = initH(c, b, "bot");
+    }
     imgs.push({ cv: c, b: b, cropL: 0.14, cropR: 0.86 });
     stripCache = [];
     renderUpload();

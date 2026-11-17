@@ -36,12 +36,13 @@
       "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/37/c1/160427be44f881a01d612f89621c/n12226-cnfwb-t2-04pl300.png"
     },
     {
-      "file": "photos/05.jpg",
+      "file": "details/05.jpg",
       "size": [
         2250,
         3000
       ],
-      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/8b/11/1e4115c44c7182c5802cde89364c/n12226-cnfwb-t2-05pl300.png"
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/8b/11/1e4115c44c7182c5802cde89364c/n12226-cnfwb-t2-05pl300.png",
+      "note": "close-up detail, not a full view: excluded from eval"
     }
   ]
 }
