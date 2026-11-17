@@ -1,0 +1,257 @@
+/* Step 4: send strips to the Hugging Face stitching space. */
+"use strict";
+/* ═══ STITCH ═══ */
+function cvToBlob(cv, q) {
+  return new Promise(function (r) {
+    cv.toBlob(
+      function (b) {
+        r(b);
+      },
+      "image/jpeg",
+      q || 0.92,
+    );
+  });
+}
+async function hfUpload(canvases) {
+  var boundary = "----FB" + Date.now().toString(36),
+    parts = [];
+  for (var i = 0; i < canvases.length; i++) {
+    var blob = await cvToBlob(canvases[i], 0.92),
+      ab = await blob.arrayBuffer();
+    parts.push(
+      new TextEncoder().encode(
+        "--" +
+          boundary +
+          '\r\nContent-Disposition: form-data; name="files"; filename="strip_' +
+          i +
+          '.jpg"\r\nContent-Type: image/jpeg\r\n\r\n',
+      ),
+    );
+    parts.push(new Uint8Array(ab));
+    parts.push(new TextEncoder().encode("\r\n"));
+  }
+  parts.push(new TextEncoder().encode("--" + boundary + "--\r\n"));
+  var tLen = 0;
+  for (var p = 0; p < parts.length; p++) tLen += parts[p].byteLength;
+  var body = new Uint8Array(tLen),
+    off = 0;
+  for (var p = 0; p < parts.length; p++) {
+    body.set(parts[p], off);
+    off += parts[p].byteLength;
+  }
+  var opts = {
+    method: "POST",
+    headers: { "Content-Type": "multipart/form-data; boundary=" + boundary },
+    body: body,
+  };
+  if (stitchAbort) opts.signal = stitchAbort.signal;
+  var resp = await fetch(HF + "/gradio_api/upload?upload_id=" + Date.now().toString(36), opts);
+  if (!resp.ok) throw new Error("Upload failed: " + resp.status);
+  return await resp.json();
+}
+function mkIO(p) {
+  return {
+    path: p,
+    url: null,
+    size: null,
+    orig_name: "strip.jpg",
+    mime_type: "image/jpeg",
+    is_stream: false,
+    meta: {},
+  };
+}
+async function hfCall(paths, doCrop) {
+  var data = [];
+  for (var i = 0; i < 5; i++) data.push(i < paths.length ? mkIO(paths[i]) : null);
+  data.push(!!doCrop);
+  var resp = await fetch(HF + "/gradio_api/call/process_images", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: data }),
+    signal: stitchAbort ? stitchAbort.signal : undefined,
+  });
+  if (!resp.ok) throw new Error("API submit failed: " + resp.status);
+  var job = await resp.json();
+  logMsg("Job: " + job.event_id);
+  var sse = await fetch(
+    HF + "/gradio_api/call/process_images/" + job.event_id,
+    stitchAbort ? { signal: stitchAbort.signal } : {},
+  );
+  if (!sse.ok) throw new Error("SSE failed: " + sse.status);
+  var rd = sse.body.getReader(),
+    dc = new TextDecoder(),
+    buf = "";
+  while (true) {
+    var ch = await rd.read();
+    if (ch.done) break;
+    buf += dc.decode(ch.value, { stream: true });
+    var cm = buf.match(/event:\s*complete\ndata:\s*(.+)/);
+    if (cm) {
+      try {
+        rd.cancel();
+      } catch (e) {}
+      return JSON.parse(cm[1])[0];
+    }
+    var em = buf.match(/event:\s*error\ndata:\s*(.+)/);
+    if (em) {
+      try {
+        rd.cancel();
+      } catch (e) {}
+      throw new Error("API: " + em[1].substring(0, 200));
+    }
+    if (buf.includes("event: heartbeat")) logMsg(t("processing"));
+  }
+  throw new Error("SSE ended without result");
+}
+async function loadResult(obj) {
+  var url = obj.url
+    ? obj.url.startsWith("/")
+      ? HF + obj.url
+      : obj.url
+    : HF + "/gradio_api/file=" + obj.path;
+  var resp = await fetch(url);
+  if (!resp.ok) throw new Error("Load failed: " + resp.status);
+  var blob = await resp.blob(),
+    u = URL.createObjectURL(blob);
+  return new Promise(function (res, rej) {
+    var im = new Image();
+    im.onload = function () {
+      var cv = document.createElement("canvas");
+      cv.width = im.width;
+      cv.height = im.height;
+      cv.getContext("2d").drawImage(im, 0, 0);
+      URL.revokeObjectURL(u);
+      res(cv);
+    };
+    im.onerror = function () {
+      URL.revokeObjectURL(u);
+      rej(new Error("Image load failed"));
+    };
+    im.src = u;
+  });
+}
+async function stitchBatch(canvases) {
+  logMsg(t("uploading") + canvases.length + t("stripsWord"));
+  var paths = await hfUpload(canvases);
+  logMsg(t("callingPS"));
+  var ct = document.getElementById("cropToggle"),
+    doCrop = ct ? ct.checked : true;
+  var r = await hfCall(paths, doCrop);
+  logMsg(t("batchDone"));
+  return await loadResult(r);
+}
+var logEl = null;
+function logMsg(m) {
+  if (logEl) {
+    logEl.style.display = "block";
+    logEl.textContent += m + "\n";
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+}
+function setProgress(pct) {
+  var f = document.getElementById("pf");
+  if (f) f.style.width = pct + "%";
+}
+function setStepState(idx, state) {
+  var steps = document.querySelectorAll("#stitchSteps .p-step");
+  if (steps[idx]) steps[idx].className = "p-step " + state;
+}
+async function runStitch() {
+  if (imgs.length < 2) return;
+  stitchRunning = true;
+  stitchAbort = new AbortController();
+  var el = document.getElementById("p3");
+  el.innerHTML =
+    '<div class="card"><div class="stitch-center"><div class="spinner" id="sp"></div><div style="font-size:.95em;font-weight:500" id="stTitle">' +
+    t("stitching") +
+    '</div><div class="pbar"><div class="pbar-fill" id="pf"></div></div><div class="p-steps" id="stitchSteps"><div class="p-step active"><div class="p-dot"></div>' +
+    t("buildingStrips") +
+    '</div><div class="p-step"><div class="p-dot"></div>' +
+    t("uploadingServer") +
+    '</div><div class="p-step"><div class="p-dot"></div>' +
+    t("runningPS") +
+    '</div><div class="p-step"><div class="p-dot"></div>' +
+    t("downloadingResult") +
+    '</div></div><button class="btn btn-outline btn-sm" id="btnAbort" style="margin-top:16px">' +
+    t("cancel") +
+    '</button></div></div><div class="stitch-log" id="stitchLog"></div>';
+  logEl = document.getElementById("stitchLog");
+  document.getElementById("btnAbort").onclick = function () {
+    if (stitchAbort) {
+      stitchAbort.abort();
+      stitchAbort = null;
+    }
+    logMsg(t("cancelled"));
+    document.getElementById("stTitle").textContent = t("cancelled");
+    document.getElementById("sp").style.display = "none";
+    this.disabled = true;
+    stitchRunning = false;
+    document.getElementById("btnBack").style.visibility = "visible";
+  };
+  try {
+    setStepState(0, "p-step active");
+    setProgress(5);
+    var strips = buildStrips(),
+      N = strips.length;
+    logMsg(N + " " + t("strips") + " (" + strips[0].width + "\u00D7" + strips[0].height + "px)");
+    setStepState(0, "p-step done");
+    setStepState(1, "p-step active");
+    setProgress(15);
+    var result;
+    if (N <= 5) {
+      var b = strips.slice();
+      while (b.length < 3) b.push(b[b.length - 1]);
+      result = await stitchBatch(b);
+      setProgress(70);
+    } else {
+      var fn = Math.min(5, N);
+      result = await stitchBatch(strips.slice(0, fn));
+      setProgress(30);
+      var done = fn,
+        bn = 2;
+      while (done < N) {
+        var tk = Math.min(N - done, 4);
+        if (tk < 2) tk = 2;
+        var batch = [result];
+        for (var i = 0; i < tk; i++) batch.push(strips[(done + i) % N]);
+        logMsg(t("batch") + bn);
+        result = await stitchBatch(batch);
+        done += tk;
+        bn++;
+        setProgress(30 + Math.round((40 * done) / N));
+      }
+    }
+    setStepState(1, "p-step done");
+    setStepState(2, "p-step done");
+    setStepState(3, "p-step active");
+    setProgress(85);
+    logMsg(t("result") + result.width + "\u00D7" + result.height + "px");
+    setStepState(3, "p-step done");
+    setProgress(100);
+    document.getElementById("stTitle").textContent = t("done");
+    document.getElementById("sp").outerHTML = '<div class="check-circle">\u2713</div>';
+    rawHFCanvas = result;
+    rCanvas = result;
+    originalHFCanvas = result;
+    topLine = [];
+    botLine = [];
+    leftLine = [];
+    rightLine = [];
+    stitchRunning = false;
+    stitchAbort = null;
+    setTimeout(function () {
+      mx = 4;
+      go(4);
+    }, 600);
+  } catch (err) {
+    if (err.name === "AbortError") return;
+    logMsg("\u2717 " + err.message);
+    document.getElementById("stTitle").textContent = t("failed");
+    document.getElementById("sp").style.display = "none";
+    var ab = document.getElementById("btnAbort");
+    if (ab) ab.disabled = true;
+    stitchRunning = false;
+    stitchAbort = null;
+    document.getElementById("btnBack").style.visibility = "visible";
+  }
+}
