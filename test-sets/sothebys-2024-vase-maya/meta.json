@@ -1,0 +1,40 @@
+{
+  "id": "sothebys-2024-vase-maya",
+  "source_url": "https://www.sothebys.com/en/buy/auction/2024/arts-dafrique-doceanie-et-des-ameriques/vase-maya",
+  "title": "Maya Polychrome Vessel | Arts d'Afrique, d'Oc\u00e9anie et des Am\u00e9riques |",
+  "images": [
+    {
+      "file": "photos/01.jpg",
+      "size": [
+        1999,
+        2000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/webnative/images/e7/0c/686c233b46c6a8f204261978e9a0/pf2408-cxhdy-t2-01.jpg"
+    },
+    {
+      "file": "details/02.jpg",
+      "size": [
+        1645,
+        2000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/webnative/images/3d/4f/d77a21c846019b1a182f20fc5e2c/pf2408-cxhdy-t2-04.jpg",
+      "note": "close-up detail, not a full view: excluded from eval"
+    },
+    {
+      "file": "photos/03.jpg",
+      "size": [
+        1911,
+        2000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/webnative/images/82/b2/e98c871f48b797da882860cd2f22/pf2408-cxhdy-t2-02.jpg"
+    },
+    {
+      "file": "photos/04.jpg",
+      "size": [
+        1894,
+        2000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/webnative/images/fd/f4/4d81325844b8a2dc21552bb6f6bc/pf2408-cxhdy-t2-03.jpg"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "id": "sothebys-2026-maya-tall-polychrome-vessel",
+  "source_url": "https://www.sothebys.com/en/buy/auction/2026/africa-oceania-americas/maya-tall-polychrome-vessel",
+  "title": "Maya Tall Polychrome Vessel | Africa | Oceania | Americas | African &",
+  "images": [
+    {
+      "file": "photos/01.jpg",
+      "size": [
+        3000,
+        3000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/d0/86/02f5cb544eebb3744b50fb7c9a79/n12226-cnfwb-t2-01pl300.png"
+    },
+    {
+      "file": "photos/02.jpg",
+      "size": [
+        3000,
+        3000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/1e/40/bd30b8f84a55a6b8b382baec96d7/n12226-cnfwb-t2-02pl300.png"
+    },
+    {
+      "file": "photos/03.jpg",
+      "size": [
+        3000,
+        3000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/fe/07/4e712c8542ccb5550c2a7629cc5f/n12226-cnfwb-t2-03pl300.png"
+    },
+    {
+      "file": "photos/04.jpg",
+      "size": [
+        3000,
+        3000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/37/c1/160427be44f881a01d612f89621c/n12226-cnfwb-t2-04pl300.png"
+    },
+    {
+      "file": "details/05.jpg",
+      "size": [
+        2250,
+        3000
+      ],
+      "url": "https://sothebys-brightspot.s3.amazonaws.com/media-desk/8b/11/1e4115c44c7182c5802cde89364c/n12226-cnfwb-t2-05pl300.png",
+      "note": "close-up detail, not a full view: excluded from eval"
+    }
+  ]
+}

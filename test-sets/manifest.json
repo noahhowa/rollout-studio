@@ -1,0 +1,60 @@
+{
+  "_doc": "Reference sets for evaluating rim detection and unwarp. Run scripts/fetch_test_sets.py to download. Images are gitignored (third-party copyright); only this manifest and per-set notes are committed. rollout_images: 1-based indices of downloaded images that are rollout photographs (saved to rollout/ instead of photos/).",
+  "sets": [
+    {
+      "id": "christies-6303183",
+      "source": "christies",
+      "url": "https://www.christies.com/en/lot/lot-6303183",
+      "manual": true,
+      "note": "Christie's blocks automated downloads; save photos by hand."
+    },
+    {
+      "id": "sothebys-2026-maya-tall-polychrome-vessel",
+      "source": "sothebys",
+      "url": "https://www.sothebys.com/en/buy/auction/2026/africa-oceania-americas/maya-tall-polychrome-vessel"
+    },
+    {
+      "id": "sothebys-2024-vase-maya",
+      "source": "sothebys",
+      "url": "https://www.sothebys.com/en/buy/auction/2024/arts-dafrique-doceanie-et-des-ameriques/vase-maya"
+    },
+    {
+      "id": "met-310364",
+      "source": "met",
+      "url": "https://www.metmuseum.org/art/collection/search/310364",
+      "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/310364",
+      "rollout_images": [
+        2
+      ],
+      "note": "Public domain (Met Open Access). Image 2 is a rollout photograph: ground truth."
+    },
+    {
+      "id": "sothebys-2023-grand-vase-cylindrique-600",
+      "source": "sothebys",
+      "url": "https://www.sothebys.com/en/buy/auction/2023/art-dafrique-doceanie-dindonesie-et-des-ameriques/grand-vase-cylindrique-maya-classique-recent-600"
+    },
+    {
+      "id": "pca4sale-446",
+      "source": "precolumbianart4sale",
+      "url": "https://www.precolumbianart4sale.com/exhibition/13/exhibition_works/446",
+      "rollout_images": [
+        6
+      ],
+      "note": "Kerr K937. Image 6 is a rollout photograph: ground truth."
+    },
+    {
+      "id": "drouot-10888511",
+      "source": "drouot",
+      "url": "https://www.gazette-drouot.com/en/lots/10888511-maya-vase-ceramique-9----",
+      "manual": true,
+      "note": "Drouot returns 403 to scripts; save photos by hand."
+    },
+    {
+      "id": "drouot-33050565",
+      "source": "drouot",
+      "url": "https://www.gazette-drouot.com/en/lots/33050565-guatemala-peten--2f-mexico----",
+      "manual": true,
+      "note": "Drouot returns 403 to scripts; save photos by hand."
+    }
+  ]
+}
