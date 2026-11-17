@@ -61,7 +61,7 @@ Key pieces of A: the background is modelled from border pixels at similar rows/c
 A2 (`refineMask`): learns the vessel's colours from A's mask, then a pixel is vessel only if it is closer to a vessel colour than to the local background or a darkened (35–100%) copy of it. On real photos it ignores one-sided shadows (Sotheby's 2024) and finds the base on the pca and most Met dark-backdrop shots. Floor scenes: 17.5/19.7/30.4 → 7.0/16.6/16.6 (the remaining error is a synthetic black base band that is as dark as the shadow).
 
 Known failures, in priority order:
-1. ~~Contact shadows / dark bases on dark backdrops~~ mostly fixed by A2; still fails on 3 Met dark-backdrop shots.
+1. ~~Contact shadows / dark bases on dark backdrops~~ fixed by A2 + silhouette repair: fragments split off by dark paint (e.g. a red base band under black rows) are merged back, and rows missing a side are mirrored about the vessel's axis (`revolve`). All 5 Met dark-backdrop shots now get the base right. Cost: the harsh synthetic floor-close scene's bottom 16.6 → 25.5, and floor-wood's top-direction decision flips (top 1.5 → 10.3).
 2. Light parts of the vessel on a white backdrop (Sotheby's 2023 bird vessel): the silhouette loses them.
 3. Very wide-angle close-ups: the "plausible lens" prior picks the wrong top-rim direction.
 4. Snap (old DP edge snap) degrades good rims: constrain it to ellipses or remove it.

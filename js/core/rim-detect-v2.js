@@ -63,7 +63,33 @@ var RIM2 = (function () {
     return cleanMask(m, W, H);
   }
 
-  // Keep the component nearest the centre (weighted by size) and fill its holes.
+  /* A vessel is a solid of revolution, so its silhouette is symmetric about a vertical axis. Repair
+     the mask row by row: gaps inside a row are filled; a row missing one side (dark paint matching
+     the backdrop) is mirrored from the other side; empty rows get their half-width interpolated
+     from the nearest rows above and below. */
+  function revolve(m, W, H) {
+    var L = new Int32Array(H).fill(-1), R = new Int32Array(H).fill(-1), y, x, mids = [];
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (m[y * W + x]) { if (L[y] < 0) L[y] = x; R[y] = x; }
+    for (y = 0; y < H; y++) if (L[y] >= 0 && R[y] - L[y] > 4) mids.push((L[y] + R[y]) / 2);
+    if (mids.length < 5) return m;
+    var xc = median(mids), hw = new Float32Array(H).fill(-1), y0 = -1, y1 = -1;
+    for (y = 0; y < H; y++) if (L[y] >= 0) { hw[y] = Math.max(xc - L[y], R[y] - xc); if (y0 < 0) y0 = y; y1 = y; }
+    for (y = y0; y <= y1; y++) if (hw[y] < 0) {
+      var a = y - 1, b = y + 1; while (hw[a] < 0) a--; while (b <= y1 && hw[b] < 0) b++;
+      hw[y] = hw[a] + ((hw[b] - hw[a]) * (y - a)) / (b - a);
+    }
+    var out = new Uint8Array(W * H);
+    for (y = y0; y <= y1; y++) {
+      var lo, hi;
+      // intact rows keep their own span; empty rows or rows with one side missing use the symmetric span
+      if (L[y] >= 0 && (R[y] - L[y]) / 2 >= 0.85 * hw[y]) { lo = L[y]; hi = R[y]; }
+      else { lo = Math.ceil(xc - hw[y]); hi = Math.floor(xc + hw[y]); }
+      for (x = Math.max(0, lo); x <= Math.min(W - 1, hi); x++) out[y * W + x] = 1;
+    }
+    return out;
+  }
+
+  // Keep the component nearest the centre (weighted by size), plus aligned fragments; fill holes.
   function cleanMask(m, W, H) {
     var i;
     // largest component (4-connected), preferring the one covering the image centre
@@ -81,7 +107,31 @@ var RIM2 = (function () {
       var score = size / (1 + cxs / size);
       if (score > bestScore) { bestScore = score; best = n; }
     }
-    for (i = 0; i < W * H; i++) m[i] = lab[i] === best ? 1 : 0;
+    // Also keep fragments stacked under/over the main one (a dark-painted band can split the vessel,
+    // e.g. the red base separated from the body by black rows): within the main component's width
+    // and a vertical gap under 25% of its height.
+    var bx = [1e9, -1, 1e9, -1, 0], boxes = {};
+    for (i = 0; i < W * H; i++) if (lab[i]) {
+      var bb = boxes[lab[i]] || (boxes[lab[i]] = [1e9, -1, 1e9, -1, 0]), px = i % W, py = (i / W) | 0;
+      if (px < bb[0]) bb[0] = px; if (px > bb[1]) bb[1] = px; if (py < bb[2]) bb[2] = py; if (py > bb[3]) bb[3] = py; bb[4]++;
+    }
+    bx = boxes[best]; var keep = {}; keep[best] = 1;
+    for (var changed = true; changed; ) {
+      changed = false;
+      for (var id in boxes) {
+        if (keep[id]) continue; var c = boxes[id];
+        if (c[4] < 0.002 * W * H) continue;
+        var ov = Math.min(c[1], bx[1]) - Math.max(c[0], bx[0]), gap = Math.max(c[2] - bx[3], bx[2] - c[3]);
+        var slack = 0.05 * (boxes[best][1] - boxes[best][0]);
+        // must fit within the vessel's width (shadows are wider) and sit close above/below it
+        if (ov > 0 && c[0] >= boxes[best][0] - slack && c[1] <= boxes[best][1] + slack && gap < 0.25 * (bx[3] - bx[2])) {
+          keep[id] = 1; changed = true;
+          bx = [Math.min(bx[0], c[0]), Math.max(bx[1], c[1]), Math.min(bx[2], c[2]), Math.max(bx[3], c[3]), bx[4] + c[4]];
+        }
+      }
+    }
+    for (i = 0; i < W * H; i++) m[i] = keep[lab[i]] ? 1 : 0;
+    m = revolve(m, W, H);
     // fill holes: background = what's reachable from the border through non-object pixels
     var out = new Uint8Array(W * H).fill(1);
     function seed(p) { if (!m[p] && out[p]) { out[p] = 0; stack.push(p); } }
