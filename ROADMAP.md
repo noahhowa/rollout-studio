@@ -17,9 +17,19 @@
 
 Without ground truth, every "better detection" is a guess.
 
-- [ ] **Synthetic test set**: a small three.js page that renders a textured cylinder or frustum at a known radius, camera distance, elevation and roll, and saves the image plus true rim ellipses and the true flat texture. Vary background, lighting and rim color.
-- [ ] **Real golden set**: 10–20 real photo sets with hand-corrected rims, saved as session JSON (the app already exports this).
-- [ ] **Metrics script**: mean rim error in pixels, and rollout error (SSIM against the true texture). Run it on every algorithm change.
+- [x] **Synthetic test set**: `eval/synth.js` ray-traces a textured cylinder at a known distance and elevation; it gives exact rims and texture.
+- [x] **Real sets**: `test-sets/` (5 sets, 2 with published rollouts). Still to do: hand-corrected rims as session JSON, so real photos can be scored too.
+- [x] **Metrics + visual report**: `node scripts/eval.js` (see `eval/README.md`).
+
+Baseline (6 synthetic scenes, mean):
+
+| pipeline | top rim err %H | bottom rim err %H | angle err 0–30° | 30–60° | 60–90° |
+|---|---|---|---|---|---|
+| baseline (auto on upload) | 8.6 | 5.6 | 16.6 | 16.8 | 17.5 |
+| baseline + Snap | 7.1 | 4.3 | 13.0 | 17.8 | 24.3 |
+| oracle (perfect rims, current unwarp) | 0 | 0 | 13.3 | 12.7 | 15.2 |
+
+On real photos the red-pixel rim scan often fails outright (e.g. the Met set, where the rims leave the image). Targets: rim error < 1% H (Phase 2), oracle angle error < 2° (Phase 3).
 
 ## Phase 2: automatic rim recognition
 
