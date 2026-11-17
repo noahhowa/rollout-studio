@@ -246,5 +246,5 @@ var RIM2 = (function () {
     return toB(scaleE(top, S.sc), scaleE(bot, S.sc), f.yMin / S.sc, f.yMax / S.sc);
   }
 
-  return { detect: detect, _silhouette: function (cv) { var S = small(cv); return { mask: silhouette(S), W: S.W, H: S.H }; } };
+  return { detect: detect, toHandles: toHandles, fitArc: fitArc, _silhouette: function (cv) { var S = small(cv); return { mask: silhouette(S), W: S.W, H: S.H }; } };
 })();

@@ -8,18 +8,18 @@ function curveAt(pts, x) {
   }
   return pts[pts.length - 1].y;
 }
-// Rims in the app's own 3-handle format, taken from the true curves ("perfect detection").
+// Rims in the app's own 3-handle format, from the true curves ("perfect detection"): fit an ellipse
+// to each true front arc, then convert with the same ellipse->handles fit the detector uses.
 function oracleB(truth) {
-  function h(pts) {
-    var xL = pts[0].x, xR = pts[pts.length - 1].x, cx = (xL + xR) / 2, s = xR - xL;
-    return [
-      { x: xL, y: curveAt(pts, xL), cp: { x: xL + s * 0.25, y: curveAt(pts, xL + s * 0.25) } },
-      { x: cx, y: curveAt(pts, cx) },
-      { x: xR, y: curveAt(pts, xR), cp: { x: xR - s * 0.25, y: curveAt(pts, xR - s * 0.25) } },
-    ];
+  function e(pts) {
+    var xL = pts[0].x, xR = pts[pts.length - 1].x, xc = (xL + xR) / 2, a = (xR - xL) / 2;
+    var xs = pts.map(function (p) { return p.x; }), ys = pts.map(function (p) { return p.y; });
+    var dn = RIM2.fitArc(xs, ys, xc, a, 1), up = RIM2.fitArc(xs, ys, xc, a, -1);
+    function res(f, sg) { var r = 0; pts.forEach(function (p) { var u = (p.x - xc) / a; r += Math.abs(p.y - (f.yc + sg * f.b * Math.sqrt(Math.max(0, 1 - u * u)))); }); return r; }
+    return res(dn, 1) <= res(up, -1) ? { xc: xc, a: a, yc: dn.yc, b: dn.b, s: 1 } : { xc: xc, a: a, yc: up.yc, b: up.b, s: -1 };
   }
-  var t = h(truth.top), bo = h(truth.bot);
-  return { topH: t, botH: bo, cx: t[1].x, r: (t[2].x - t[0].x) / 2, xLeft: t[0].x, xRight: t[2].x, yTop: t[1].y, yBot: bo[1].y };
+  var te = e(truth.top), be = e(truth.bot), t = RIM2.toHandles(te), bo = RIM2.toHandles(be);
+  return { topH: t, botH: bo, topE: te, botE: be, cx: te.xc, r: te.a, xLeft: te.xc - te.a, xRight: te.xc + te.a, yTop: t[1].y, yBot: bo[1].y };
 }
 // Mean |error| of a pipeline's rims vs truth, in % of vessel height, over the middle 90% of the width.
 function ellH(e) { return { e: e }; } // marker: evaluate the ellipse itself, not its 3-handle approximation
@@ -122,7 +122,7 @@ function runPipelines(cv, truth, extra) {
   });
   if (truth) { // the unwarp's own error, with perfect rims: isolates the depth/perspective problem
     var ob = oracleB(truth), ocv = unwarp(cv, ob);
-    out.push({ name: "oracle", b: ob, strip: toJpeg(ocv, 500), rim: { top: 0, bot: 0 }, ang: angularError(ocv, extra.tex, extra.rot) });
+    out.push({ name: "oracle", b: ob, strip: toJpeg(ocv, 500), rim: rimError(ob, truth), ang: angularError(ocv, extra.tex, extra.rot) });
   }
   return out;
 }
