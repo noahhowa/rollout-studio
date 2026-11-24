@@ -65,7 +65,8 @@ function show() {
   img.onload = function () { cv.width = img.naturalWidth; cv.height = img.naturalHeight; draw(); };
   img.src = cur().url;
 }
-function halfEllipse(p) { // p: [left, right, mid] in px -> points along the front arc
+function halfEllipse(p) { // p: [end, end, mid] in px -> points along the front arc
+  if (p[0][0] > p[1][0]) p = [p[1], p[0], p[2]];
   var xl = p[0][0], yl = p[0][1], xr = p[1][0], yr = p[1][1], xc = (xl + xr) / 2, a = (xr - xl) / 2, yc = (yl + yr) / 2, b = p[2][1] - yc, out = [];
   for (var i = 0; i <= 60; i++) { var u = -1 + (2 * i) / 60; out.push([xc + u * a, yc + b * Math.sqrt(Math.max(0, 1 - u * u))]); }
   return out;

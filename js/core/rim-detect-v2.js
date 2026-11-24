@@ -292,7 +292,7 @@ var RIM2 = (function () {
     if (opts.twoClass !== false) mask = refineMask(S, mask); // default on; {twoClass:false} = plain A
     var f = fitFromMask(mask, S.W, S.H), top = f.top, bot = f.bot;
     if (!top || !bot) return null;
-    top.s = cameraAboveTop(top, bot, S.H) ? 1 : -1;
+    top.s = opts.topDir || (cameraAboveTop(top, bot, S.H) ? 1 : -1);
     return toB(scaleE(top, S.sc), scaleE(bot, S.sc), f.yMin / S.sc, f.yMax / S.sc);
   }
 

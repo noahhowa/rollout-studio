@@ -21,6 +21,8 @@ var PIPELINES = {
   "A silhouette": function (cv) { return RIM2.detect(cv, { twoClass: false }); },
   // Current app default: A + two-class (vessel colours vs background/shadow) mask refinement
   "A2 two-class": function (cv) { return RIM2.detect(cv); },
+  // experiment: always assume the camera is above the top rim
+  "A2 above": function (cv) { return RIM2.detect(cv, { topDir: 1 }); },
   // A2 + Snap
   "A+snap": function (cv) {
     var b = RIM2.detect(cv), im = { cv: cv, b: b };

@@ -129,6 +129,7 @@ function runPipelines(cv, truth, extra) {
 // Hand label (3 normalised clicks per rim: left end, right end, front middle) -> truth curves in px.
 function labelTruth(L, W, H) {
   function arc(p) {
+    if (p[0][0] > p[1][0]) p = [p[1], p[0], p[2]]; // ends may be clicked in either order
     var xl = p[0][0] * W, yl = p[0][1] * H, xr = p[1][0] * W, yr = p[1][1] * H, xc = (xl + xr) / 2, a = (xr - xl) / 2, yc = (yl + yr) / 2, b = p[2][1] * H - yc, out = [];
     for (var i = 0; i <= 60; i++) { var u = -1 + (2 * i) / 60; out.push({ x: xc + u * a, y: yc + b * Math.sqrt(Math.max(0, 1 - u * u)) }); }
     return out;
