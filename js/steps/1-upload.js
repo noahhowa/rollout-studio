@@ -5,20 +5,23 @@ var fi = document.getElementById("fi");
 fi.onchange = function (e) {
   doFiles(e.target.files);
 };
+// Photos keep the order they were selected in. Files load asynchronously and finish in any order
+// (large files later), so each gets a sequence number and is inserted in sequence, not on arrival.
+var uploadSeq = 0;
 function doFiles(fs) {
   Array.from(fs).forEach(function (f) {
     if (/\.json$/i.test(f.name)) {
       loadSession(f);
       return;
     }
-    var r = new FileReader();
+    var seq = uploadSeq++, r = new FileReader();
     r.onload = function (e) {
-      loadSrc(e.target.result);
+      loadSrc(e.target.result, seq);
     };
     r.readAsDataURL(f);
   });
 }
-function loadSrc(src) {
+function loadSrc(src, seq) {
   var im = new Image();
   im.onload = function () {
     var sc = Math.min(1, 1200 / im.width),
@@ -34,7 +37,9 @@ function loadSrc(src) {
       b.topH = initH(c, b, "top");
       b.botH = initH(c, b, "bot");
     }
-    imgs.push({ cv: c, b: b, cropL: 0.14, cropR: 0.86 });
+    var entry = { cv: c, b: b, cropL: 0.14, cropR: 0.86, seq: seq == null ? uploadSeq++ : seq }, at = imgs.length;
+    while (at > 0 && imgs[at - 1].seq != null && imgs[at - 1].seq > entry.seq) at--;
+    imgs.splice(at, 0, entry);
     stripCache = [];
     renderUpload();
     document.getElementById("btnNext").disabled = imgs.length < 2;

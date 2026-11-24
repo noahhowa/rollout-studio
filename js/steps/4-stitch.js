@@ -174,6 +174,14 @@ function autoOrder() {
   }
   var order = [];
   for (var m = 0; m < a.length; m++) order.push(a[(gapAt + m) % a.length].i);
+  // If the upload order already goes round the vessel in sequence (any starting photo, either
+  // direction), keep it: changing only the starting photo can make the server stitch worse.
+  var n = order.length, pos = order.indexOf(0), fwd = true, bwd = true;
+  for (var j = 0; j < n; j++) {
+    if (order[(pos + j) % n] !== j) fwd = false;
+    if (order[(pos - j + n) % n] !== j) bwd = false;
+  }
+  if (fwd || bwd) return null;
   return order;
 }
 
