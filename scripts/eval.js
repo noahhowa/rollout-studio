@@ -19,7 +19,7 @@ const SYNTH = [
 ].map((p) => ({ W: 800, H: 1000, rot: 0, ...p, fov: (2 * Math.atan((1.2 * 2.4) / p.dist) * 180) / Math.PI }));
 
 function serve() {
-  const types = { ".html": "text/html", ".js": "text/javascript", ".jpg": "image/jpeg", ".css": "text/css" };
+  const types = { ".html": "text/html", ".js": "text/javascript", ".jpg": "image/jpeg", ".png": "image/png", ".css": "text/css" };
   return new Promise((res) => {
     const s = http.createServer((q, r) => {
       const f = path.join(ROOT, decodeURIComponent(q.url.split("?")[0]));
@@ -34,13 +34,17 @@ function realCases() {
   const dir = path.join(ROOT, "test-sets"), cases = [], rollouts = {};
   const lf = path.join(dir, "labels.json"), labels = fs.existsSync(lf) ? JSON.parse(fs.readFileSync(lf, "utf8")) : {};
   for (const set of fs.readdirSync(dir)) {
+    const metaFile = path.join(dir, set, "meta.json");
+    const meta = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, "utf8")) : {};
+    const scales = meta.evaluationScales || [1];
     for (const sub of ["photos", "rollout"]) {
       const p = path.join(dir, set, sub);
       if (!fs.existsSync(p)) continue;
-      for (const f of fs.readdirSync(p).filter((f) => /\.jpe?g$/i.test(f)).sort()) {
+      for (const f of fs.readdirSync(p).filter((f) => /\.(?:jpe?g|png)$/i.test(f)).sort()) {
         const src = `/test-sets/${set}/${sub}/${f}`;
-        if (sub === "photos") cases.push({ set, file: f, src, label: labels[`${set}/photos/${f}`] || null });
-        else (rollouts[set] = rollouts[set] || []).push(src);
+        if (sub === "photos") {
+          for (const scale of scales) cases.push({ set, file: scale === 1 ? f : `${f} @ ${scale}x`, src, scale, label: labels[`${set}/photos/${f}`] || null });
+        } else (rollouts[set] = rollouts[set] || []).push(src);
       }
     }
   }

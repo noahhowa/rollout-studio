@@ -1,0 +1,11 @@
+{
+  "id": "bottom-rim-regression",
+  "title": "Dark painted band truncation and floor shadow leakage",
+  "source": "Two user-supplied screenshots, 2026-11-17",
+  "evaluationScales": [
+    0.75,
+    1,
+    1.5
+  ],
+  "note": "Hand labels identify the front base arc. The left image reproduces the mid-body cutoff at 75% size, while the right image reproduces floor leakage at full and 150% size."
+}

@@ -89,8 +89,34 @@ var RIM2 = (function () {
     return out;
   }
 
+  // A contact shadow can re-expand below a rounded base and survive component merging.
+  // Stop at a sudden shelf after the silhouette has already tapered toward its centre.
+  function trimShadowShelf(mask, W, H) {
+    var spans = [], widths = [], first = -1, last = -1;
+    for (var y = 0; y < H; y++) {
+      var span = rowSpan(mask, W, y); spans.push(span);
+      if (span) { if (first < 0) first = y; last = y; }
+    }
+    if (last - first < 20) return mask;
+    var height = last - first;
+    for (y = Math.round(first + 0.25 * height); y <= first + 0.7 * height; y++) {
+      if (spans[y]) widths.push(spans[y].r - spans[y].l + 1);
+    }
+    var bodyWidth = median(widths), lookback = Math.max(2, Math.round(0.008 * height));
+    if (bodyWidth < 10) return mask;
+    for (y = Math.round(first + 0.7 * height); y <= last; y++) {
+      var before = spans[y - lookback], now = spans[y];
+      if (!before || !now) continue;
+      var oldWidth = before.r - before.l + 1, newWidth = now.r - now.l + 1;
+      if (oldWidth < 0.75 * bodyWidth && newWidth > 0.95 * bodyWidth && newWidth - oldWidth > 0.25 * bodyWidth) {
+        mask.fill(0, y * W); break;
+      }
+    }
+    return mask;
+  }
+
   // Keep the component nearest the centre (weighted by size), plus aligned fragments; fill holes.
-  function cleanMask(m, W, H) {
+  function cleanMask(m, W, H, gapFraction) {
     var i;
     // largest component (4-connected), preferring the one covering the image centre
     var lab = new Int32Array(W * H), stack = [], best = -1, bestScore = 0, n = 0;
@@ -109,7 +135,7 @@ var RIM2 = (function () {
     }
     // Also keep fragments stacked under/over the main one (a dark-painted band can split the vessel,
     // e.g. the red base separated from the body by black rows): within the main component's width
-    // and a vertical gap under 25% of its height.
+    // and a vertical gap under 25% of its height (75% while recovering a truncated base).
     var bx = [1e9, -1, 1e9, -1, 0], boxes = {};
     for (i = 0; i < W * H; i++) if (lab[i]) {
       var bb = boxes[lab[i]] || (boxes[lab[i]] = [1e9, -1, 1e9, -1, 0]), px = i % W, py = (i / W) | 0;
@@ -124,7 +150,7 @@ var RIM2 = (function () {
         var ov = Math.min(c[1], bx[1]) - Math.max(c[0], bx[0]), gap = Math.max(c[2] - bx[3], bx[2] - c[3]);
         var slack = 0.05 * (boxes[best][1] - boxes[best][0]);
         // must fit within the vessel's width (shadows are wider) and sit close above/below it
-        if (ov > 0 && c[0] >= boxes[best][0] - slack && c[1] <= boxes[best][1] + slack && gap < 0.25 * (bx[3] - bx[2])) {
+        if (ov > 0 && c[0] >= boxes[best][0] - slack && c[1] <= boxes[best][1] + slack && gap < (gapFraction || 0.25) * (bx[3] - bx[2])) {
           keep[id] = 1; changed = true;
           bx = [Math.min(bx[0], c[0]), Math.max(bx[1], c[1]), Math.min(bx[2], c[2]), Math.max(bx[3], c[3]), bx[4] + c[4]];
         }
@@ -148,7 +174,7 @@ var RIM2 = (function () {
      re-classify pixels around it. A pixel is vessel only if it is closer to a vessel colour than to
      the local background or a darkened copy of it (a shadow: 35-100% of the background's brightness).
      This removes contact shadows and recovers dark bases that merely resemble the backdrop. */
-  function refineMask(S, mask) {
+  function refineMask(S, mask, recoverBase) {
     var W = S.W, H = S.H, d = S.d, i, x, y, obj = [], x0 = W, x1 = 0, y0 = H, y1 = 0;
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (mask[y * W + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     if (x1 <= x0) return mask;
@@ -166,7 +192,7 @@ var RIM2 = (function () {
     for (x = 0; x < W; x += bs) { tb.push(px(x, m)); tb.push(px(x, H - 1 - m)); }
     var out = new Uint8Array(mask), wy = 0.12 * H, edge = 0.25 * H;
     var rx0 = Math.max(0, x0 - Math.round(0.1 * (x1 - x0))), rx1 = Math.min(W - 1, x1 + Math.round(0.1 * (x1 - x0)));
-    var ry0 = Math.max(0, y0 - 2), ry1 = Math.min(H - 1, y1 + Math.round(0.15 * (y1 - y0)));
+    var ry0 = Math.max(0, y0 - 2), ry1 = recoverBase ? H - 1 : Math.min(H - 1, y1 + Math.round(0.15 * (y1 - y0)));
     for (y = ry0; y <= ry1; y++) {
       var cand = side.filter(function (s) { return Math.abs(s[4] - y) <= wy; });
       if (y < edge || y > H - edge) tb.forEach(function (s) { if (Math.abs(s[4] - y) <= edge) cand.push(s); });
@@ -187,7 +213,7 @@ var RIM2 = (function () {
         out[y * W + x] = dO < dB ? 1 : 0;
       }
     }
-    return cleanMask(out, W, H);
+    return cleanMask(out, W, H, recoverBase ? 0.75 : 0.25);
   }
 
   function median(a) { var s = a.slice().sort(function (x, y) { return x - y; }); return s.length ? s[s.length >> 1] : 0; }
@@ -342,9 +368,19 @@ var RIM2 = (function () {
 
   function detect(cv, opts) {
     opts = opts || {};
-    var S = small(cv), mask = silhouette(S);
-    if (opts.twoClass !== false) mask = refineMask(S, mask); // default on; {twoClass:false} = plain A
+    var S = small(cv), mask = silhouette(S), initial = fitFromMask(mask, S.W, S.H);
+    // A flat cut well above the image bottom can be a dark painted band that split the mask.
+    // Search the remaining rows rather than stopping 15% below that incomplete component.
+    var fixBase = opts.twoClass !== false && opts.trimShadows !== false;
+    var recoverBase = fixBase && initial.bot && initial.bot.b < 2 && initial.yMax < 0.85 * S.H;
+    if (opts.twoClass !== false) mask = refineMask(S, mask, recoverBase);
+    if (fixBase) mask = trimShadowShelf(mask, S.W, S.H);
     var f = fitFromMask(mask, S.W, S.H), top = f.top, bot = f.bot;
+    // Preserve a similarly wide, rounded base when refinement grows far into the floor below it.
+    if (fixBase && initial.bot && bot && initial.bot.b > 3 && initial.bot.a >= 0.85 * bot.a &&
+        f.yMax - initial.yMax > 0.06 * (initial.yMax - initial.yMin)) {
+      bot = initial.bot; f.yMax = initial.yMax;
+    }
     if (!top || !bot) return null;
     // Front arc of the top rim bows down (camera above the rim), as in museum/product photos.
     // A perspective-based above/below guess was tried and lost on hand-labelled photos (3.9% vs 1.1%).
