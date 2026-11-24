@@ -50,6 +50,11 @@ var AUTORECT = (function () {
     while (top.length > 2 && trimmed < 4 && jump(1)) { top.shift(); bot.shift(); trimmed++; }
     while (top.length > 2 && trimmed < 8 && jump(top.length - 1)) { top.pop(); bot.pop(); trimmed++; }
     for (var k3 = 1; k3 < top.length; k3++) if (jump(k3)) { api.reason = 'jagged at sample ' + k3; return null; }
+    // Only a roughly horizontal band is straightened. A strongly tilted or fragmented stitch (e.g. a
+    // failed one) is left to the user rather than traced along its diagonal edges.
+    function tilt(pts) { return Math.abs(Math.atan2(pts[pts.length - 1].y - pts[0].y, pts[pts.length - 1].x - pts[0].x)) * 180 / Math.PI; }
+    if (top.length >= 2 && (tilt(top) > 8 || tilt(bot) > 8)) { api.reason = "band too tilted (" + Math.round(Math.max(tilt(top), tilt(bot))) + " deg)"; return null; }
+    if (last - first < 0.6 * W) { api.reason = "band covers only part of the width"; return null; }
     return top.length >= 2 ? { top: top, bot: bot } : null;
   }
   var api = { bandLines: bandLines, reason: null };

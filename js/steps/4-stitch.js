@@ -135,8 +135,7 @@ async function stitchBatch(canvases) {
   logMsg(t("uploading") + canvases.length + t("stripsWord"));
   var paths = await hfUpload(canvases);
   logMsg(t("callingPS"));
-  var ct = document.getElementById("cropToggle"),
-    doCrop = ct ? ct.checked : true;
+  var doCrop = false; // the Space no longer takes a smart-crop flag
   var r = await hfCall(paths, doCrop);
   logMsg(t("batchDone"));
   return await loadResult(r);
@@ -239,7 +238,9 @@ async function runStitch() {
       N = strips.length;
     await nextFrame();
     var order = null;
-    try { order = autoOrder(); } catch (e) { order = null; }
+    var aot = document.getElementById("autoOrderToggle");
+    if (aot) autoOrderOn = aot.checked;
+    if (autoOrderOn) { try { order = autoOrder(); } catch (e) { order = null; } }
     if (order && order.some(function (v, k) { return v !== k; })) {
       strips = order.map(function (i) { return strips[i]; });
       logMsg(t("autoSorted") + order.map(function (i) { return i + 1; }).join(", "));
