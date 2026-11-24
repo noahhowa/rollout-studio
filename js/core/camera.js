@@ -121,10 +121,23 @@ var ROLLCAMERA = (function () {
     var ctx = result.getContext("2d"), output = ctx.createImageData(W, H);
     var input = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height);
     var visible = Math.acos(1 / model.distance);
+    /* Pre-rectification (size.rectify): keep the camera's horizontal (angle) mapping, but pin each
+       column vertically to the *detected* rims, so the top rim is row 0 and the bottom rim the last
+       row. A small camera-height error otherwise bends the rims into waves that differ per photo. */
+    var pin = null, bounds = size && size.bounds;
+    if (size && size.rectify && bounds && bounds.topH && bounds.botH) {
+      pin = [];
+      for (var cx = 0; cx < W; cx++) {
+        var th = (cx / (W - 1) - 0.5) * Math.PI, pt = project(model, th, 0), pb = project(model, th, 1);
+        var yT = evalRimCurve(bounds.topH, pt.x), yB = evalRimCurve(bounds.botH, pb.x), span = pb.y - pt.y;
+        pin.push(span > 1 ? { top: pt.y, scale: (yB - yT) / span, yT: yT } : null);
+      }
+    }
     for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
       var theta = (x / (W - 1) - 0.5) * Math.PI;
       if (Math.abs(theta) >= visible - 0.005) continue;
       var p = project(model, theta, y / (H - 1));
+      if (pin && pin[x]) p = { x: p.x, y: pin[x].yT + (p.y - pin[x].top) * pin[x].scale };
       if (p.x < 0 || p.y < 0 || p.x >= cv.width - 1 || p.y >= cv.height - 1) continue;
       var color = bil(input.data, cv.width, cv.height, p.x, p.y), i = 4 * (y * W + x);
       for (var channel = 0; channel < 3; channel++) output.data[i + channel] = color[channel];

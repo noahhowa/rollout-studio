@@ -167,7 +167,7 @@ var ROLLREGISTER = (function () {
       if (!models.length) models = rawModels[index].slice(0, 2);
       models.push(null);
       return models.map(function (model) {
-        var strip = ROLLCAMERA.flatten(image.cv, model, radius, { width: 360, height: 120, bounds: image.b });
+        var strip = ROLLCAMERA.flatten(image.cv, model, radius, { width: 360, height: 120, bounds: image.b, rectify: true });
         return { model: model, columns: describe(strip) };
       });
     });

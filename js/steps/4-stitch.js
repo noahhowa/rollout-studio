@@ -161,13 +161,15 @@ function setStepState(idx, state) {
    Returns a canvas, or null when the photos can't be lined up reliably (caller falls back to the
    server). Uses each photo's crop from the Adjust step and the feather setting. */
 function localStitch() {
+  // Experimental: off by default until real-photo registration is reliable. Enable with ?local=1.
+  if (!/[?&]local=1\b/.test(location.search)) return null;
   if (typeof ROLLREGISTER === "undefined" || imgs.length < 2) return null;
   var inputs = imgs.map(function (im) { return { cv: im.cv, b: im.b, cropL: im.cropL, cropR: im.cropR }; });
   var t0 = performance.now(), reg = ROLLREGISTER.estimate(inputs);
   logMsg(t("localStitch") + ": " + (reg.connected ? "ok" : "not connected") + " (" + Math.round(performance.now() - t0) + " ms)");
   if (!reg.connected) return null;
   var strips = imgs.map(function (im, i) {
-    return ROLLCAMERA.flatten(im.cv, reg.cameras[i], hGeom(im.b).r, { bounds: im.b });
+    return ROLLCAMERA.flatten(im.cv, reg.cameras[i], hGeom(im.b).r, { bounds: im.b, rectify: true });
   });
   var out = ROLLREGISTER.compose(inputs, reg, strips, { feather: feather / 100 });
   if (!out) return null;
@@ -218,6 +220,7 @@ async function runStitch() {
     setProgress(15);
     await nextFrame(); // let the progress UI paint before the synchronous local solve
     var result = null;
+    var tryLocal = /[?&]local=1\b/.test(location.search);
     try { result = localStitch(); } catch (e) { logMsg("\u2717 local: " + e.message); result = null; }
     if (result) {
       logMsg(t("localDone") + result.width + "\u00D7" + result.height + "px");
@@ -228,7 +231,7 @@ async function runStitch() {
       setStepState(2, "p-step done");
     } else {
       if (!stitchRunning) return; // cancelled meanwhile
-      logMsg(t("localFallback"));
+      if (tryLocal) logMsg(t("localFallback"));
       setStepState(1, "p-step active");
     }
     if (result) {
