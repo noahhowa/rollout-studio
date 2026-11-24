@@ -121,7 +121,7 @@ var AUTORECT = (function () {
     var good = blocks.filter(function (bl) { return bl.ok; }).length;
     api.painted = { blocks: blocks.length, aligned: good };
     function corrAt(c6) { var bi = Math.max(0, Math.min(blocks.length - 1, Math.floor((c6 - first) / BW))); return blocks[bi]; }
-    var useProfile = good >= 0.6 * blocks.length, insetR = 0.01 * typical;
+    var useProfile = !api.outlineOnly && good >= 0.6 * blocks.length, insetR = 0.01 * typical;
     for (var k2 = 0; k2 <= n; k2++) {
       var cx = Math.round(first + (last - first) * k2 / n), t = smooth(tops, cx), b = smooth(bots, cx);
       if (t === null || b === null) continue;
