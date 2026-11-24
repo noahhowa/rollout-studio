@@ -183,7 +183,8 @@ function localStitch() {
   window.lastStitchQuality = q; // for testing
   // Quality gate: an overlap whose detail disagrees means ghosting; don't show it, use the server.
   if (q.minNCC == null || q.minNCC < STITCH_MIN_NCC) { logMsg(t("qualityLow")); return null; }
-  var out = ROLLREGISTER.compose(inputs, reg, strips, { feather: feather / 100 });
+  var out = ROLLREGISTER.composeSeams(inputs, reg, strips) || ROLLREGISTER.compose(inputs, reg, strips, { feather: feather / 100 });
+  if (out && out.shifts) logMsg("Seams: vertical shifts " + out.shifts.join(",") + " px");
   if (!out) return null;
   if (out.span < 2 * Math.PI - 0.01) logMsg(t("coverageGap") + " (" + Math.round((out.span * 180) / Math.PI) + "\u00B0)");
   return out.canvas;

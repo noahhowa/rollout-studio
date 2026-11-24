@@ -426,5 +426,121 @@ var ROLLREGISTER = (function () {
     ctx.putImageData(result, 0, 0);
     return { canvas: output, coveragePct: 100 * count / (W * H), start: start, span: span };
   }
-  return { estimate: estimate, compose: compose, refine: refine, refineCameras: refineCameras, wrap: wrap, _dbg: { detailMap: detailMap, overlapNCC: overlapNCC, limitsOf: limitsOf } };
+  /* Seam-based compositing. Ghosting comes from averaging two photos that disagree (lighting, small
+     shape differences), so instead each output column is owned by ONE photo:
+     1. each photo is drawn into its own output-space layer;
+     2. neighbouring photos are aligned vertically (integer row shift that best matches their
+        overlap) and matched in exposure (per-channel gain), both chained around the set;
+     3. columns start owned by the most face-on photo; where ownership changes, the seam moves
+        within the overlap to the column where the two photos agree best;
+     4. a narrow crossfade (~1 degree) hides the seam. Gaps stay transparent. */
+  function composeSeams(images, registration, strips, opts) {
+    opts = opts || {};
+    if (!registration.connected || strips.length !== images.length) return null;
+    var N = images.length, rot = registration.rotations, lim = limitsOf(images, registration);
+    var radius = median(images.map(function (image) { return hGeom(image.b).r; }));
+    var coverage = new Array(720).fill(false);
+    for (var x = 0; x < coverage.length; x++) {
+      var angle = TAU * (x + 0.5) / coverage.length - Math.PI;
+      coverage[x] = images.some(function (_, i) { var l = wrap(angle - rot[i]); return l > lim[i].lo && l < lim[i].hi; });
+    }
+    var longest = 0, gapEnd = 0, run = 0;
+    for (x = 0; x < 2 * coverage.length; x++) { run = coverage[x % coverage.length] ? 0 : Math.min(coverage.length, run + 1); if (run > longest) { longest = run; gapEnd = x; } }
+    if (longest === coverage.length) return null;
+    var full = opts.fullCircle || longest <= 4;
+    var start = full ? -Math.PI : TAU * ((gapEnd + 1) % coverage.length) / coverage.length - Math.PI;
+    var span = full ? TAU : TAU * (1 - longest / coverage.length);
+    var W = opts.width || Math.max(10, Math.round(span * radius)), H = opts.height || Math.max(10, Math.round(median(strips.map(function (cv) { return cv.height; }))));
+    // 1. layers (RGBA, output space) and per-column face-on weight
+    var layers = strips.map(function (cv, i) {
+      var im = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height), out = new Float32Array(W * H * 4), wcol = new Float32Array(W);
+      var mid = (lim[i].lo + lim[i].hi) / 2, half = (lim[i].hi - lim[i].lo) / 2;
+      for (var xx = 0; xx < W; xx++) {
+        var th = wrap(start + span * (xx + 0.5) / W - rot[i]);
+        if (th <= lim[i].lo || th >= lim[i].hi) continue;
+        wcol[xx] = Math.cos((th - mid) / half * Math.PI / 2);
+        var px = (th / Math.PI + 0.5) * (im.width - 1);
+        for (var y = 0; y < H; y++) {
+          var py = (y + 0.5) / H * (im.height - 1), sx = Math.floor(px), sy = Math.floor(py), fx = px - sx, fy = py - sy, j = 4 * (sy * im.width + sx) + 3;
+          var alpha = im.data[j] * (1 - fx) * (1 - fy) + im.data[j + 4] * fx * (1 - fy) + im.data[j + 4 * im.width] * (1 - fx) * fy + im.data[j + 4 * im.width + 4] * fx * fy;
+          if (alpha < 250) continue;
+          var c = bil(im.data, im.width, im.height, px, py), k = 4 * (y * W + xx);
+          out[k] = c[0]; out[k + 1] = c[1]; out[k + 2] = c[2]; out[k + 3] = 1;
+        }
+      }
+      return { px: out, w: wcol };
+    });
+    var order = rot.map(function (r, i) { return { i: i, r: ((r % TAU) + TAU) % TAU }; }).sort(function (a, b) { return a.r - b.r; }).map(function (o) { return o.i; });
+    function overlapCols(a, b) { var cols = []; for (var xx = 0; xx < W; xx++) if (layers[a].w[xx] > 0 && layers[b].w[xx] > 0) cols.push(xx); return cols; }
+    // 2. vertical offsets and gains, chained around the angular order
+    var shift = new Array(N).fill(0), gain = images.map(function () { return [1, 1, 1]; }), maxShift = Math.round(0.06 * H);
+    function at(i, xx, y, ch) { var yy = y + shift[i]; if (yy < 0 || yy >= H) return NaN; var k = 4 * (yy * W + xx); return layers[i].px[k + 3] ? layers[i].px[k + ch] : NaN; }
+    for (var o = 1; o < order.length; o++) {
+      var a = order[o - 1], b = order[o], cols = overlapCols(a, b);
+      if (cols.length < 8) continue;
+      var best = null;
+      for (var dy = -maxShift; dy <= maxShift; dy++) {
+        var sum = 0, n = 0;
+        for (var ci = 0; ci < cols.length; ci += 3) for (var y = maxShift; y < H - maxShift; y += 3) {
+          var va = at(a, cols[ci], y, 1), kb = 4 * ((y + shift[a] + dy) * W + cols[ci]);
+          if (va !== va || !layers[b].px[kb + 3]) continue;
+          sum += Math.abs(va - layers[b].px[kb + 1]); n++;
+        }
+        if (n > 50 && (!best || sum / n < best.cost)) best = { cost: sum / n, dy: dy };
+      }
+      if (best) shift[b] = shift[a] + best.dy;
+      for (var ch = 0; ch < 3; ch++) { // exposure: match B's mean to A's over the overlap
+        var sa = 0, sb = 0;
+        for (var cj = 0; cj < cols.length; cj += 2) for (var y2 = 0; y2 < H; y2 += 2) { var u = at(a, cols[cj], y2, ch), v = at(b, cols[cj], y2, ch); if (u === u && v === v) { sa += u; sb += v; } }
+        gain[b][ch] = sb > 0 ? gain[a][ch] * sa / sb : gain[a][ch];
+      }
+    }
+    var meanShift = Math.round(shift.reduce(function (x1, y1) { return x1 + y1; }, 0) / N);
+    shift = shift.map(function (v) { return v - meanShift; });
+    for (var ch2 = 0; ch2 < 3; ch2++) { var gm = gain.reduce(function (x1, g) { return x1 + g[ch2]; }, 0) / N; gain.forEach(function (g) { g[ch2] /= gm; }); }
+    // 3. owners: most face-on photo per column, then move each seam to where neighbours agree
+    var owner = new Int16Array(W).fill(-1);
+    for (var xx2 = 0; xx2 < W; xx2++) { var bw = 0; for (var i2 = 0; i2 < N; i2++) if (layers[i2].w[xx2] > bw) { bw = layers[i2].w[xx2]; owner[xx2] = i2; } }
+    function colCost(a, b, xx) {
+      var sum = 0, n = 0;
+      for (var y = 0; y < H; y += 2) { var u = at(a, xx, y, 1) * gain[a][1], v = at(b, xx, y, 1) * gain[b][1]; if (u === u && v === v) { sum += Math.abs(u - v); n++; } }
+      return n > H / 8 ? sum / n : Infinity;
+    }
+    for (var xs = 1; xs < W; xs++) {
+      var A = owner[xs - 1], B = owner[xs];
+      if (A < 0 || B < 0 || A === B) continue;
+      var lo = xs, hi = xs; while (lo > 0 && layers[B].w[lo - 1] > 0 && owner[lo - 1] === A) lo--; while (hi < W - 1 && layers[A].w[hi + 1] > 0 && owner[hi + 1] === B) hi++;
+      var bestX = xs, bestC = Infinity;
+      for (var cx = lo; cx <= hi; cx++) { var cst = colCost(A, B, cx) * (1 + 0.5 * Math.abs(cx - xs) / Math.max(1, hi - lo)); if (cst < bestC) { bestC = cst; bestX = cx; } }
+      for (var fill = lo; fill < bestX; fill++) owner[fill] = A;
+      for (var fill2 = bestX; fill2 <= hi; fill2++) owner[fill2] = B;
+      xs = hi + 1;
+    }
+    // 4. composite with a narrow crossfade at seams
+    var fade = Math.max(2, Math.round(W / 360)), output = document.createElement("canvas"); output.width = W; output.height = H;
+    var ctx = output.getContext("2d"), result = ctx.createImageData(W, H), count = 0;
+    for (var x3 = 0; x3 < W; x3++) {
+      var own = owner[x3]; if (own < 0) continue;
+      var mix = []; // (photo, weight): owner, plus a neighbour near a seam
+      var dl = 0; while (x3 - dl - 1 >= 0 && owner[x3 - dl - 1] === own && dl < fade) dl++;
+      var dr = 0; while (x3 + dr + 1 < W && owner[x3 + dr + 1] === own && dr < fade) dr++;
+      mix.push([own, 1]);
+      if (dl < fade && x3 - dl - 1 >= 0 && owner[x3 - dl - 1] >= 0) mix.push([owner[x3 - dl - 1], 0.5 * (1 - dl / fade)]);
+      if (dr < fade && x3 + dr + 1 < W && owner[x3 + dr + 1] >= 0) mix.push([owner[x3 + dr + 1], 0.5 * (1 - dr / fade)]);
+      for (var y3 = 0; y3 < H; y3++) {
+        var rgb = [0, 0, 0], tw = 0;
+        mix.forEach(function (m) {
+          var i3 = m[0], yy = y3 + shift[i3]; if (yy < 0 || yy >= H) return;
+          var k = 4 * (yy * W + x3); if (!layers[i3].px[k + 3]) return;
+          for (var c3 = 0; c3 < 3; c3++) rgb[c3] += m[1] * layers[i3].px[k + c3] * gain[i3][c3];
+          tw += m[1];
+        });
+        if (tw <= 0) continue;
+        var k2 = 4 * (y3 * W + x3); for (var c4 = 0; c4 < 3; c4++) result.data[k2 + c4] = rgb[c4] / tw; result.data[k2 + 3] = 255; count++;
+      }
+    }
+    ctx.putImageData(result, 0, 0);
+    return { canvas: output, coveragePct: 100 * count / (W * H), start: start, span: span, shifts: shift, gains: gain };
+  }
+  return { estimate: estimate, compose: compose, composeSeams: composeSeams, refine: refine, refineCameras: refineCameras, wrap: wrap, _dbg: { detailMap: detailMap, overlapNCC: overlapNCC, limitsOf: limitsOf } };
 })();
