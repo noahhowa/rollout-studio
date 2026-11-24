@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adjust · Hugging Face stitch comparison</title>
+<style>
+:root{color-scheme:light dark}body{font:16px/1.52 system-ui,sans-serif;margin:30px auto;max-width:1120px;padding:0 20px}
+h1{margin:0 0 8px}h2{margin-top:28px}p{max-width:85ch}img{display:block;width:100%;height:auto}figure{margin:0}
+figcaption{margin-bottom:6px;font-weight:600}.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.detail{max-width:900px}table{border-collapse:collapse;width:100%;min-width:480px;font-variant-numeric:tabular-nums}
+.wrap{overflow-x:auto}th,td{text-align:right;padding:6px 10px;border-bottom:1px solid color-mix(in srgb,currentColor 22%,transparent)}
+th:first-child{text-align:left}@media(max-width:600px){.pair{grid-template-columns:1fr}}
+</style></head><body>
+<h1>Bounded vertical correction in Adjust</h1>
+<p>Both panoramas were returned by the app’s Hugging Face Space before Refine. The inputs were the same four stills of LACMA 168693, in the same order, with the shipped Map and identical 8–92% crops and 12% feathering. The second arm adds a vertical warp bounded to 3% of each strip’s height and tapers it to zero at the top and bottom. <a href="https://collections.lacma.org/object/168693">LACMA collection record</a></p>
+<h2>Full panoramas before Refine</h2>
+<div class="pair">
+<figure><figcaption>Current Adjust</figcaption><a href="images/baseline.png"><img src="images/baseline.png" alt="Hugging Face panorama from unchanged strips."></a></figure>
+<figure><figcaption>Bounded correction</figcaption><a href="images/adjusted.png"><img src="images/adjusted.png" alt="Hugging Face panorama from the same strips with bounded vertical correction."></a></figure>
+</div>
+<h2>Estimated vertical disagreement at the joins</h2>
+<p>Pixel distances on the returned panoramas. Each strip’s placement was recovered by matching it to the corresponding blended panorama. The same shared landmarks were then projected from both contributing strips to estimate the misregistration at each join.</p>
+<div class="wrap"><table><thead><tr><th scope="col">Views</th><th scope="col">Landmarks</th><th scope="col">Median px<br>Current → corrected</th><th scope="col">90th percentile px<br>Current → corrected</th></tr></thead><tbody><tr><th scope="row">1–2</th><td>474</td><td>3.18 → 1.83</td><td>8.18 → 6.20</td></tr><tr><th scope="row">2–3</th><td>814</td><td>3.65 → 2.28</td><td>9.33 → 6.32</td></tr><tr><th scope="row">3–4</th><td>55</td><td>2.47 → 2.07</td><td>4.86 → 4.40</td></tr></tbody></table></div>
+<p>The correction reduced the overlap error in all three joins. In the full panoramas the change is subtle. Exposure changes and the remaining bottom-border steps are still visible. The default 14–86% crop failed in both arms. A local replay of the Space’s matcher put the 3–4 pair below its 10% inlier threshold at that crop.</p>
+<h2>Join close-ups</h2>
+<p>Each close-up shows the upper and lower painted bands near the center of the corresponding overlap. The crops use the same pixel scale.</p>
+<h3>Views 1–2</h3><div class="pair detail"><figure><figcaption>Current Adjust</figcaption><a href="images/baseline-1-2.jpg"><img src="images/baseline-1-2.jpg" alt="Current Adjust, detail near views 1–2"></a></figure><figure><figcaption>Bounded correction</figcaption><a href="images/adjusted-1-2.jpg"><img src="images/adjusted-1-2.jpg" alt="Bounded correction, detail near views 1–2"></a></figure></div><h3>Views 2–3</h3><div class="pair detail"><figure><figcaption>Current Adjust</figcaption><a href="images/baseline-2-3.jpg"><img src="images/baseline-2-3.jpg" alt="Current Adjust, detail near views 2–3"></a></figure><figure><figcaption>Bounded correction</figcaption><a href="images/adjusted-2-3.jpg"><img src="images/adjusted-2-3.jpg" alt="Bounded correction, detail near views 2–3"></a></figure></div><h3>Views 3–4</h3><div class="pair detail"><figure><figcaption>Current Adjust</figcaption><a href="images/baseline-3-4.jpg"><img src="images/baseline-3-4.jpg" alt="Current Adjust, detail near views 3–4"></a></figure><figure><figcaption>Bounded correction</figcaption><a href="images/adjusted-3-4.jpg"><img src="images/adjusted-3-4.jpg" alt="Bounded correction, detail near views 3–4"></a></figure></div>
+<h2>Verification</h2>
+<p>Before stitching, spatial holdout error across 1,464 overlap landmarks fell from 0.274% to 0.148% of strip height. The estimate in the table uses the returned mosaics and includes landmarks used in the final correction. It measures geometric agreement and leaves exposure or blending differences for visual inspection. The comparison covers one vessel. Production code was untouched.</p>
+<p><a href="seams.json">Seam metrics</a> · <a href="coefficients.json">Correction and preflight metrics</a> · <a href="https://huggingface.co/spaces/noahhowa/image-stitch-fork">Hugging Face Space</a></p>
+</body></html>
