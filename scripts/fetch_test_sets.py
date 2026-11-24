@@ -17,13 +17,19 @@ from PIL import Image
 MAX_SIDE = 3000
 
 ROOT = Path(__file__).resolve().parent.parent / "test-sets"
-UA = {"User-Agent": "Mozilla/5.0 (rollout-studio test-set fetcher)"}
 IMG_EXT = re.compile(r"\.(jpe?g|png|webp)(\?|$)", re.I)
 
 
-def get(url):
-    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r:
-        return r.read()
+def get(url, tries=4):
+    """Fetch with curl (some museum servers refuse Python's default client), with retries."""
+    import subprocess, time
+    for k in range(tries):  # museum APIs rate-limit and sometimes drop connections
+        r = subprocess.run(["curl", "-sSfL", "--max-time", "120", url], capture_output=True)
+        if r.returncode == 0 and r.stdout:
+            return r.stdout
+        if k == tries - 1:
+            raise RuntimeError(f"curl failed ({r.returncode}): {r.stderr.decode()[:120]}")
+        time.sleep(3 * (k + 1))
 
 
 def met_images(api):
@@ -108,19 +114,23 @@ def fetch_set(s):
     d = ROOT / s["id"]
     (d / "photos").mkdir(parents=True, exist_ok=True)
     (d / "rollout").mkdir(exist_ok=True)
-    if s.get("api"):
+    if s.get("images"):
+        meta, urls = {"title": s.get("title")}, s["images"]
+    elif s.get("api"):
         meta, urls = met_images(s["api"])
     else:
         meta, urls = EXTRACTORS.get(s["source"], scrape_images)(s["url"])
-    for old in (d / "photos").glob("*"):
+    for old in list((d / "photos").glob("*")) + list((d / "rollout").glob("*")):
         old.unlink()
     rollouts = set(s.get("rollout_images", []))
     saved = []
     for i, u in enumerate(urls, 1):
-        sub = "rollout" if i in rollouts else "photos"
-        out = d / sub / f"{i:02d}.jpg"
         try:
-            w, h = save_jpeg(get(u), out)
+            data = get(u)
+            iw, ih = Image.open(io.BytesIO(data)).size
+            sub = "rollout" if i in rollouts or iw > 2 * ih else "photos"  # wide image = rollout photo
+            out = d / sub / f"{i:02d}.jpg"
+            w, h = save_jpeg(data, out)
             saved.append({"file": f"{sub}/{out.name}", "size": [w, h], "url": u})
         except Exception as e:  # keep going; report at the end
             print(f"  ! {u}: {e}")
