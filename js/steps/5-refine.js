@@ -68,6 +68,11 @@ function renderRefine() {
     rcv.width = Math.round(rawHFCanvas.width * rectSc);
     rcv.height = Math.round(rawHFCanvas.height * rectSc);
     if (!topLine.length) {
+      // Pre-fill the band's detected top/bottom edges (js/core/auto-rectify.js); placeholders otherwise.
+      var auto = typeof AUTORECT !== "undefined" ? AUTORECT.bandLines(rawHFCanvas) : null;
+      if (auto) { topLine = auto.top; botLine = auto.bot; }
+    }
+    if (!topLine.length) {
       var pad = Math.round(rawHFCanvas.width * 0.02);
       topLine = [
         { x: pad, y: Math.round(rawHFCanvas.height * 0.15) },
@@ -113,11 +118,12 @@ function renderRefine() {
       H = rawHFCanvas.height,
       pad = Math.round(W * 0.02),
       pad2 = Math.round(W * 0.12);
-    topLine = [
+    var auto = typeof AUTORECT !== "undefined" ? AUTORECT.bandLines(rawHFCanvas) : null;
+    topLine = auto ? auto.top : [
       { x: pad, y: Math.round(H * 0.15) },
       { x: W - pad, y: Math.round(H * 0.15) },
     ];
-    botLine = [
+    botLine = auto ? auto.bot : [
       { x: pad, y: Math.round(H * 0.85) },
       { x: W - pad, y: Math.round(H * 0.85) },
     ];
