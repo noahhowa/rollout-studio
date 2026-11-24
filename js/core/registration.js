@@ -267,6 +267,112 @@ var ROLLREGISTER = (function () {
     return { connected: best.graph.connected, cameras: best.choices.map(function (c, i) { return options[i][c].model; }),
       rotations: best.graph.rotations, confidence: confidence, pairs: pairs, method: method };
   }
+  // Valid angle range (radians, strip-local) of each photo: its Adjust-step crop and what its camera sees.
+  function limitsOf(images, registration) {
+    return images.map(function (image, i) {
+      var lo = Math.PI * ((image.cropL == null ? 0.14 : image.cropL) - 0.5), hi = Math.PI * ((image.cropR == null ? 0.86 : image.cropR) - 0.5), camera = registration.cameras[i];
+      if (camera) { var visible = Math.acos(1 / camera.distance) - 0.005; lo = Math.max(lo, -visible); hi = Math.min(hi, visible); }
+      return { lo: lo, hi: hi };
+    });
+  }
+  /* Detail map for fine alignment and the quality gate: the matcher's own descriptor (0.5 deg per
+     column, slow shading removed). Finer maps were tried; perspective stretch between two views of
+     the same overlap made fine detail disagree even at the correct offset. */
+  function detailMap(cv) { return { W: COLS, H: ROWS, v: describe(cv) }; }
+  // NCC of two strips' overlap in cylinder angle, at rotations ri and rj. Returns {ncc, cells}.
+  function overlapNCC(A, B, ri, rj, li, lj) {
+    var lo = Math.max(ri + li.lo, rj + lj.lo), hi = Math.min(ri + li.hi, rj + lj.hi);
+    // also try the overlap across the +-pi seam
+    if (hi - lo < 0.05) { var rj2 = rj + (rj < ri ? TAU : -TAU); lo = Math.max(ri + li.lo, rj2 + lj.lo); hi = Math.min(ri + li.hi, rj2 + lj.hi); rj = rj2; }
+    if (hi - lo < 0.05) return { ncc: null, cells: 0 };
+    var sab = 0, saa = 0, sbb = 0, sa = 0, sb = 0, n = 0, step = Math.PI / (A.W - 1);
+    for (var t = lo + step / 2; t < hi; t += step) {
+      var xa = Math.round(((t - ri) / Math.PI + 0.5) * (A.W - 1)), xb = Math.round(((t - rj) / Math.PI + 0.5) * (B.W - 1));
+      if (xa < 0 || xb < 0 || xa >= A.W || xb >= B.W) continue;
+      for (var y = 4; y < A.H - 4; y++) {
+        var a = A.v[y * A.W + xa], b = B.v[y * B.W + xb]; if (a !== a || b !== b) continue;
+        sab += a * b; saa += a * a; sbb += b * b; sa += a; sb += b; n++;
+      }
+    }
+    if (n < 100) return { ncc: null, cells: n };
+    var cov = sab / n - (sa / n) * (sb / n), va = saa / n - (sa / n) * (sa / n), vb = sbb / n - (sb / n) * (sb / n);
+    return { ncc: va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : null, cells: n };
+  }
+  /* Fine alignment: nudge each photo's rotation (up to +-3 degrees) to maximise agreement of its
+     overlaps with all other photos, by coordinate descent (coarse 0.25 deg, then 0.05 deg). Photo 0
+     stays the origin. Then the quality gate: report the agreement of every overlapping pair; a poor
+     minimum means ghosting. Mutates registration.rotations; returns {pairs, minNCC, meanNCC}. */
+  function refine(images, registration, strips) {
+    var maps = strips.map(detailMap), lim = limitsOf(images, registration), N = images.length, rot = registration.rotations;
+    function total(i, r) {
+      var s = 0, w = 0;
+      for (var j = 0; j < N; j++) if (j !== i) { var o = overlapNCC(maps[i], maps[j], r, rot[j], lim[i], lim[j]); if (o.ncc !== null) { s += o.ncc * o.cells; w += o.cells; } }
+      return w ? s / w : null;
+    }
+    var D = Math.PI / 180;
+    for (var pass = 0; pass < 3; pass++) for (var i = 1; i < N; i++) {
+      var base = rot[i], best = total(i, base), bestR = base;
+      if (best === null) continue;
+      for (var d = -3; d <= 3.0001; d += 0.25) { var v = total(i, base + d * D); if (v !== null && v > best) { best = v; bestR = base + d * D; } }
+      var c = bestR;
+      for (var e = -0.25; e <= 0.2501; e += 0.05) { var v2 = total(i, c + e * D); if (v2 !== null && v2 > best) { best = v2; bestR = c + e * D; } }
+      rot[i] = wrap(bestR);
+    }
+    var pairs = [];
+    for (var a = 0; a < N; a++) for (var b = a + 1; b < N; b++) {
+      var o = overlapNCC(maps[a], maps[b], rot[a], rot[b], lim[a], lim[b]);
+      if (o.ncc !== null) pairs.push({ i: a, j: b, ncc: o.ncc, cells: o.cells });
+    }
+    // The gate ignores sliver overlaps (under ~15 degrees), which are mostly oblique edge pixels.
+    var minCells = 30 * (ROWS - 8) * 0.5, nccs = pairs.filter(function (p) { return p.cells >= minCells; }).map(function (p) { return p.ncc; });
+    return { pairs: pairs, minNCC: nccs.length ? Math.min.apply(null, nccs) : null,
+      meanNCC: nccs.length ? nccs.reduce(function (x, y) { return x + y; }, 0) / nccs.length : null };
+  }
+  /* Camera refinement: the remaining ghosting comes from each photo's angle mapping, not its
+     placement. For each photo (coordinate descent, two passes), try small changes to the camera
+     distance (with focal length rescaled so the vessel's width in the photo stays fixed) and to the
+     axis position (cx), re-flatten a small strip, and keep the change if its overlaps with all
+     other photos agree better at the best rotation within +-3 degrees. Mutates registration. */
+  function refineCameras(images, registration) {
+    var N = images.length, cams = registration.cameras, rot = registration.rotations, D = Math.PI / 180;
+    var inputs = images.map(function (im) { return im.cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, im.cv.width, im.cv.height); });
+    function mapFor(i, cam) {
+      var strip = ROLLCAMERA.flatten(images[i].cv, cam, hGeom(images[i].b).r, { width: COLS, height: 120, bounds: images[i].b, rectify: true, input: inputs[i] });
+      return { W: COLS, H: ROWS, v: describe(strip) };
+    }
+    var maps = images.map(function (_, i) { return mapFor(i, cams[i]); });
+    function agreement(i, map, r, lim) {
+      var s = 0, w = 0;
+      for (var j = 0; j < N; j++) if (j !== i) {
+        var o = overlapNCC(map, maps[j], r, rot[j], lim[i], lim[j]);
+        if (o.ncc !== null && o.cells >= 300) { s += o.ncc * o.cells; w += o.cells; }
+      }
+      return w ? s / w : null;
+    }
+    function bestRotation(i, map, lim) {
+      var best = { score: agreement(i, map, rot[i], lim), r: rot[i] };
+      if (i === 0 || best.score === null) return best;
+      for (var d = -3; d <= 3.0001; d += 0.5) { var v = agreement(i, map, rot[i] + d * D, lim); if (v !== null && v > best.score) best = { score: v, r: rot[i] + d * D }; }
+      return best;
+    }
+    for (var pass = 0; pass < 2; pass++) for (var i = 0; i < N; i++) {
+      var cam = cams[i]; if (!cam) continue;
+      var lim = limitsOf(images, registration), cur = bestRotation(i, maps[i], lim), bestCam = cam, bestMap = maps[i];
+      if (cur.score === null) continue;
+      var w = images[i].cv.width;
+      [0.85, 0.92, 1, 1.08, 1.17].forEach(function (k) {
+        [-0.02, 0, 0.02].forEach(function (dx) {
+          if (k === 1 && dx === 0) return;
+          var d2 = Math.max(1.3, cam.distance * k), f2 = cam.focal * Math.sqrt(d2 * d2 - 1) / Math.sqrt(cam.distance * cam.distance - 1);
+          var trial = Object.assign({}, cam, { distance: d2, focal: f2, cx: cam.cx + dx * w });
+          var save = cams[i]; cams[i] = trial; var lim2 = limitsOf(images, registration); cams[i] = save;
+          var m = mapFor(i, trial), b = bestRotation(i, m, lim2);
+          if (b.score !== null && b.score > cur.score + 0.005) { cur = b; bestCam = trial; bestMap = m; }
+        });
+      });
+      cams[i] = bestCam; maps[i] = bestMap; rot[i] = wrap(cur.r);
+    }
+  }
   function compose(images, registration, strips, opts) {
     opts = opts || {};
     if (!registration.connected || strips.length !== images.length) return null;
@@ -320,5 +426,121 @@ var ROLLREGISTER = (function () {
     ctx.putImageData(result, 0, 0);
     return { canvas: output, coveragePct: 100 * count / (W * H), start: start, span: span };
   }
-  return { estimate: estimate, compose: compose, wrap: wrap };
+  /* Seam-based compositing. Ghosting comes from averaging two photos that disagree (lighting, small
+     shape differences), so instead each output column is owned by ONE photo:
+     1. each photo is drawn into its own output-space layer;
+     2. neighbouring photos are aligned vertically (integer row shift that best matches their
+        overlap) and matched in exposure (per-channel gain), both chained around the set;
+     3. columns start owned by the most face-on photo; where ownership changes, the seam moves
+        within the overlap to the column where the two photos agree best;
+     4. a narrow crossfade (~1 degree) hides the seam. Gaps stay transparent. */
+  function composeSeams(images, registration, strips, opts) {
+    opts = opts || {};
+    if (!registration.connected || strips.length !== images.length) return null;
+    var N = images.length, rot = registration.rotations, lim = limitsOf(images, registration);
+    var radius = median(images.map(function (image) { return hGeom(image.b).r; }));
+    var coverage = new Array(720).fill(false);
+    for (var x = 0; x < coverage.length; x++) {
+      var angle = TAU * (x + 0.5) / coverage.length - Math.PI;
+      coverage[x] = images.some(function (_, i) { var l = wrap(angle - rot[i]); return l > lim[i].lo && l < lim[i].hi; });
+    }
+    var longest = 0, gapEnd = 0, run = 0;
+    for (x = 0; x < 2 * coverage.length; x++) { run = coverage[x % coverage.length] ? 0 : Math.min(coverage.length, run + 1); if (run > longest) { longest = run; gapEnd = x; } }
+    if (longest === coverage.length) return null;
+    var full = opts.fullCircle || longest <= 4;
+    var start = full ? -Math.PI : TAU * ((gapEnd + 1) % coverage.length) / coverage.length - Math.PI;
+    var span = full ? TAU : TAU * (1 - longest / coverage.length);
+    var W = opts.width || Math.max(10, Math.round(span * radius)), H = opts.height || Math.max(10, Math.round(median(strips.map(function (cv) { return cv.height; }))));
+    // 1. layers (RGBA, output space) and per-column face-on weight
+    var layers = strips.map(function (cv, i) {
+      var im = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height), out = new Float32Array(W * H * 4), wcol = new Float32Array(W);
+      var mid = (lim[i].lo + lim[i].hi) / 2, half = (lim[i].hi - lim[i].lo) / 2;
+      for (var xx = 0; xx < W; xx++) {
+        var th = wrap(start + span * (xx + 0.5) / W - rot[i]);
+        if (th <= lim[i].lo || th >= lim[i].hi) continue;
+        wcol[xx] = Math.cos((th - mid) / half * Math.PI / 2);
+        var px = (th / Math.PI + 0.5) * (im.width - 1);
+        for (var y = 0; y < H; y++) {
+          var py = (y + 0.5) / H * (im.height - 1), sx = Math.floor(px), sy = Math.floor(py), fx = px - sx, fy = py - sy, j = 4 * (sy * im.width + sx) + 3;
+          var alpha = im.data[j] * (1 - fx) * (1 - fy) + im.data[j + 4] * fx * (1 - fy) + im.data[j + 4 * im.width] * (1 - fx) * fy + im.data[j + 4 * im.width + 4] * fx * fy;
+          if (alpha < 250) continue;
+          var c = bil(im.data, im.width, im.height, px, py), k = 4 * (y * W + xx);
+          out[k] = c[0]; out[k + 1] = c[1]; out[k + 2] = c[2]; out[k + 3] = 1;
+        }
+      }
+      return { px: out, w: wcol };
+    });
+    var order = rot.map(function (r, i) { return { i: i, r: ((r % TAU) + TAU) % TAU }; }).sort(function (a, b) { return a.r - b.r; }).map(function (o) { return o.i; });
+    function overlapCols(a, b) { var cols = []; for (var xx = 0; xx < W; xx++) if (layers[a].w[xx] > 0 && layers[b].w[xx] > 0) cols.push(xx); return cols; }
+    // 2. vertical offsets and gains, chained around the angular order
+    var shift = new Array(N).fill(0), gain = images.map(function () { return [1, 1, 1]; }), maxShift = Math.round(0.06 * H);
+    function at(i, xx, y, ch) { var yy = y + shift[i]; if (yy < 0 || yy >= H) return NaN; var k = 4 * (yy * W + xx); return layers[i].px[k + 3] ? layers[i].px[k + ch] : NaN; }
+    for (var o = 1; o < order.length; o++) {
+      var a = order[o - 1], b = order[o], cols = overlapCols(a, b);
+      if (cols.length < 8) continue;
+      var best = null;
+      for (var dy = -maxShift; dy <= maxShift; dy++) {
+        var sum = 0, n = 0;
+        for (var ci = 0; ci < cols.length; ci += 3) for (var y = maxShift; y < H - maxShift; y += 3) {
+          var va = at(a, cols[ci], y, 1), kb = 4 * ((y + shift[a] + dy) * W + cols[ci]);
+          if (va !== va || !layers[b].px[kb + 3]) continue;
+          sum += Math.abs(va - layers[b].px[kb + 1]); n++;
+        }
+        if (n > 50 && (!best || sum / n < best.cost)) best = { cost: sum / n, dy: dy };
+      }
+      if (best) shift[b] = shift[a] + best.dy;
+      for (var ch = 0; ch < 3; ch++) { // exposure: match B's mean to A's over the overlap
+        var sa = 0, sb = 0;
+        for (var cj = 0; cj < cols.length; cj += 2) for (var y2 = 0; y2 < H; y2 += 2) { var u = at(a, cols[cj], y2, ch), v = at(b, cols[cj], y2, ch); if (u === u && v === v) { sa += u; sb += v; } }
+        gain[b][ch] = sb > 0 ? gain[a][ch] * sa / sb : gain[a][ch];
+      }
+    }
+    var meanShift = Math.round(shift.reduce(function (x1, y1) { return x1 + y1; }, 0) / N);
+    shift = shift.map(function (v) { return v - meanShift; });
+    for (var ch2 = 0; ch2 < 3; ch2++) { var gm = gain.reduce(function (x1, g) { return x1 + g[ch2]; }, 0) / N; gain.forEach(function (g) { g[ch2] /= gm; }); }
+    // 3. owners: most face-on photo per column, then move each seam to where neighbours agree
+    var owner = new Int16Array(W).fill(-1);
+    for (var xx2 = 0; xx2 < W; xx2++) { var bw = 0; for (var i2 = 0; i2 < N; i2++) if (layers[i2].w[xx2] > bw) { bw = layers[i2].w[xx2]; owner[xx2] = i2; } }
+    function colCost(a, b, xx) {
+      var sum = 0, n = 0;
+      for (var y = 0; y < H; y += 2) { var u = at(a, xx, y, 1) * gain[a][1], v = at(b, xx, y, 1) * gain[b][1]; if (u === u && v === v) { sum += Math.abs(u - v); n++; } }
+      return n > H / 8 ? sum / n : Infinity;
+    }
+    for (var xs = 1; xs < W; xs++) {
+      var A = owner[xs - 1], B = owner[xs];
+      if (A < 0 || B < 0 || A === B) continue;
+      var lo = xs, hi = xs; while (lo > 0 && layers[B].w[lo - 1] > 0 && owner[lo - 1] === A) lo--; while (hi < W - 1 && layers[A].w[hi + 1] > 0 && owner[hi + 1] === B) hi++;
+      var bestX = xs, bestC = Infinity;
+      for (var cx = lo; cx <= hi; cx++) { var cst = colCost(A, B, cx) * (1 + 0.5 * Math.abs(cx - xs) / Math.max(1, hi - lo)); if (cst < bestC) { bestC = cst; bestX = cx; } }
+      for (var fill = lo; fill < bestX; fill++) owner[fill] = A;
+      for (var fill2 = bestX; fill2 <= hi; fill2++) owner[fill2] = B;
+      xs = hi + 1;
+    }
+    // 4. composite with a narrow crossfade at seams
+    var fade = Math.max(2, Math.round(W / 360)), output = document.createElement("canvas"); output.width = W; output.height = H;
+    var ctx = output.getContext("2d"), result = ctx.createImageData(W, H), count = 0;
+    for (var x3 = 0; x3 < W; x3++) {
+      var own = owner[x3]; if (own < 0) continue;
+      var mix = []; // (photo, weight): owner, plus a neighbour near a seam
+      var dl = 0; while (x3 - dl - 1 >= 0 && owner[x3 - dl - 1] === own && dl < fade) dl++;
+      var dr = 0; while (x3 + dr + 1 < W && owner[x3 + dr + 1] === own && dr < fade) dr++;
+      mix.push([own, 1]);
+      if (dl < fade && x3 - dl - 1 >= 0 && owner[x3 - dl - 1] >= 0) mix.push([owner[x3 - dl - 1], 0.5 * (1 - dl / fade)]);
+      if (dr < fade && x3 + dr + 1 < W && owner[x3 + dr + 1] >= 0) mix.push([owner[x3 + dr + 1], 0.5 * (1 - dr / fade)]);
+      for (var y3 = 0; y3 < H; y3++) {
+        var rgb = [0, 0, 0], tw = 0;
+        mix.forEach(function (m) {
+          var i3 = m[0], yy = y3 + shift[i3]; if (yy < 0 || yy >= H) return;
+          var k = 4 * (yy * W + x3); if (!layers[i3].px[k + 3]) return;
+          for (var c3 = 0; c3 < 3; c3++) rgb[c3] += m[1] * layers[i3].px[k + c3] * gain[i3][c3];
+          tw += m[1];
+        });
+        if (tw <= 0) continue;
+        var k2 = 4 * (y3 * W + x3); for (var c4 = 0; c4 < 3; c4++) result.data[k2 + c4] = rgb[c4] / tw; result.data[k2 + 3] = 255; count++;
+      }
+    }
+    ctx.putImageData(result, 0, 0);
+    return { canvas: output, coveragePct: 100 * count / (W * H), start: start, span: span, shifts: shift, gains: gain };
+  }
+  return { estimate: estimate, compose: compose, composeSeams: composeSeams, refine: refine, refineCameras: refineCameras, wrap: wrap, _dbg: { detailMap: detailMap, overlapNCC: overlapNCC, limitsOf: limitsOf } };
 })();

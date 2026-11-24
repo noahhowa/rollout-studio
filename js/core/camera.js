@@ -119,7 +119,8 @@ var ROLLCAMERA = (function () {
     var H = size && size.height || Math.max(10, Math.round(model.height * radius));
     var result = document.createElement("canvas"); result.width = W; result.height = H;
     var ctx = result.getContext("2d"), output = ctx.createImageData(W, H);
-    var input = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height);
+    // size.input: the photo's pixels, pre-read by callers that flatten the same photo many times
+    var input = size && size.input || cv.getContext("2d").getImageData(0, 0, cv.width, cv.height);
     var visible = Math.acos(1 / model.distance);
     /* Pre-rectification (size.rectify): keep the camera's horizontal (angle) mapping, but pin each
        column vertically to the *detected* rims, so the top rim is row 0 and the bottom rim the last
