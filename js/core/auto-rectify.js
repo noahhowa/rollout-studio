@@ -78,6 +78,11 @@ var AUTORECT = (function () {
         for (var k5 = 0.8; k5 <= 1.2501; k5 += 0.025) for (var d5 = -maxD; d5 <= maxD; d5 += 1) {
           var v = ncc(pr, ref, d5, k5, c0r); if (v > best) { best = v; bd = d5; bk = k5; }
         }
+        // refine: stretch in 0.5% steps, shift in 0.25 px steps (coarse steps made the edges wobble)
+        var cd = bd, ck = bk;
+        for (var k6 = ck - 0.025; k6 <= ck + 0.0251; k6 += 0.005) for (var d6 = cd - 1.5; d6 <= cd + 1.51; d6 += 0.25) {
+          var v2 = ncc(pr, ref, d6, k6, c0r); if (v2 > best) { best = v2; bd = d6; bk = k6; }
+        }
         bl.d = bd; bl.k = bk; bl.score = best; bl.ok = best > 0.5;
       });
       // Outliers: a slice far from the median of its wider neighbourhood (+-4 slices) takes that median.
@@ -92,10 +97,16 @@ var AUTORECT = (function () {
         // slices that matched poorly, or disagree sharply with their neighbourhood, take its values
         if (!bl.ok || Math.abs(bl.d - m.d) > 0.05 * typical || Math.abs(bl.k - m.k) > 0.05) { bl.d = m.d; bl.k = m.k; bl.ok = true; }
       });
+      // Smooth along the band with a triangular moving average (+-4 slices), weighted by match quality.
+      // A median let neighbouring slices jump between values, which made the edges ripple.
       var sm = blocks.map(function (bl, i8) {
-        var dd = [], kk = [];
-        for (var j8 = Math.max(0, i8 - 1); j8 <= Math.min(blocks.length - 1, i8 + 1); j8++) if (blocks[j8].ok) { dd.push(blocks[j8].d); kk.push(blocks[j8].k); }
-        return dd.length ? { d: median(dd), k: median(kk), ok: true } : { d: 0, k: 1, ok: false };
+        var sd = 0, skk = 0, sw = 0;
+        for (var j8 = Math.max(0, i8 - 4); j8 <= Math.min(blocks.length - 1, i8 + 4); j8++) {
+          if (!blocks[j8].ok) continue;
+          var w = (5 - Math.abs(j8 - i8)) * Math.max(0.05, blocks[j8].score || 0.5);
+          sd += w * blocks[j8].d; skk += w * blocks[j8].k; sw += w;
+        }
+        return sw ? { d: sd / sw, k: skk / sw, ok: true } : { d: 0, k: 1, ok: false };
       });
       blocks.forEach(function (bl, i9) { bl.d = sm[i9].d; bl.k = sm[i9].k; bl.ok = sm[i9].ok; });
       if (iter === 0) { // reference = average of aligned good profiles (back-mapped into reference rows)
