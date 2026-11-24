@@ -5,6 +5,7 @@
    - top ellipse: seeded from the silhouette's back arc, then checked against the visible front lip
    - bottom ellipse: fitted to the silhouette's bottom edge (= front half of the bottom rim)
    - the camera is assumed to be above the top rim (front arc bows down)
+   - nearly flat tilted lips may use a locally fitted line in the handle representation
    Evaluated against the old red-pixel scan and three variants in eval/ (see ROADMAP.md). */
 "use strict";
 
@@ -270,7 +271,7 @@ var RIM2 = (function () {
     return { top: one("top"), bot: one("bot"), yMin: yMin, yMax: yMax };
   }
 
-  function frontY(e, x) { var u = (x - e.xc) / e.a; return e.yc + (e.s || 1) * e.b * Math.sqrt(Math.max(0, 1 - u * u)); }
+  function frontY(e, x) { var u = (x - e.xc) / e.a; return e.yc + (e.tilt || 0) * (x - e.xc) + (e.s || 1) * e.b * Math.sqrt(Math.max(0, 1 - u * u)); }
 
   // Ellipse (in full-res px) -> app's 3-handle rim format (front half). The outer control points
   // are chosen by search so the app's curve (evalRimCurve) follows the ellipse as closely as possible.
@@ -366,6 +367,32 @@ var RIM2 = (function () {
     e.b = (e.b + fit.b) / 2;
   }
 
+  // A flat but tilted lip cannot pass the axis-aligned arc residual check.
+  // Recover a coherent local line, keeping its width and rejecting painted-band jumps.
+  function refineTiltedLip(cv, e, height) {
+    if (e.b > 0.03 * e.a) return;
+    var blur = Math.max(1, Math.round(cv.width / WORK)), reach = 0.035 * height;
+    var y0 = Math.max(0, Math.floor(e.yc - reach - blur - 1));
+    var y1 = Math.min(cv.height, Math.ceil(e.yc + reach + blur + 1));
+    if (y1 <= y0) return;
+    var im = cv.getContext("2d").getImageData(0, y0, cv.width, y1 - y0), pts = [];
+    for (var i = -12; i <= 12; i++) {
+      var x = e.xc + e.a * i / 15, y = edgeY(im, x, e.yc - y0, reach, blur);
+      if (y !== null) pts.push({ x: x - e.xc, y: y + y0 });
+    }
+    if (pts.length < 20) return;
+    var active = pts.slice(), yc, tilt;
+    for (var it = 0; it < 3; it++) {
+      if (active.length < 18) return;
+      var sx = 0, sy = 0, sxx = 0, sxy = 0, n = active.length;
+      active.forEach(function (p) { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y; });
+      tilt = (n * sxy - sx * sy) / (n * sxx - sx * sx); yc = (sy - tilt * sx) / n;
+      active = active.filter(function (p) { return Math.abs(p.y - yc - tilt * p.x) < 2 * blur; });
+    }
+    if (active.length < 20 || Math.abs(tilt) < 0.015 || Math.abs(tilt) > 0.15 || Math.abs(yc - e.yc) > reach) return;
+    e.yc = yc; e.b = 0; e.tilt = tilt;
+  }
+
   // A painted band can leave a shallow initial base that a later floor-leak guard preserves.
   // Recover its curvature from the outer side columns, excluding central contact shadows.
   function recoverBaseCurve(mask, W, H, e, yMin, yMax) {
@@ -428,6 +455,7 @@ var RIM2 = (function () {
     if (refine) recoverFlatRimWidth(top, mask, S.W, height);
     top = scaleE(top, S.sc);
     if (refine && top.s === 1) refineFrontRim(cv, top, height / S.sc);
+    if (refine && opts.tiltedLip !== false) refineTiltedLip(cv, top, height / S.sc);
     return toB(top, scaleE(bot, S.sc), f.yMin / S.sc, bottomLimit / S.sc);
   }
 

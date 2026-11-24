@@ -61,8 +61,14 @@ function makeRimCard(im, idx) {
   reBtn.textContent = "\u21BA";
   reBtn.title = t("resetRims");
   reBtn.onclick = function () {
-    im.b.topH = initH(im.cv, im.b, "top");
-    im.b.botH = initH(im.cv, im.b, "bot");
+    // Re-run the current detector, including for rims loaded from an older session.
+    var detected = null;
+    try { detected = RIM2.detect(im.cv); } catch (e) {}
+    if (detected) Object.assign(im.b, detected);
+    else {
+      im.b.topH = initH(im.cv, im.b, "top");
+      im.b.botH = initH(im.cv, im.b, "bot");
+    }
     stripCache = [];
     redraw(null);
     updatePreview();
