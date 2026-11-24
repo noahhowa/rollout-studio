@@ -50,25 +50,39 @@ var ROLLREGISTER = (function () {
     var cov = sab / sw - (sa / sw) * (sb / sw), va = saa / sw - (sa / sw) * (sa / sw), vb = sbb / sw - (sb / sw) * (sb / sw);
     return { score: va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : -1, cells: cells };
   }
+  function refinePeak(first, second, shift0, limit) {
+    var best = null;
+    for (var s = shift0 - 2; s <= shift0 + 2; s++) for (var dy = -3; dy <= 3; dy++) {
+      var r = blockScore(first.columns, second.columns, s, dy, limit);
+      if (!best || r.score > best.score) best = { score: r.score, shift: s, dy: dy, count: r.cells };
+    }
+    var l = blockScore(first.columns, second.columns, best.shift - 1, best.dy, limit).score, rr = blockScore(first.columns, second.columns, best.shift + 1, best.dy, limit).score;
+    var curvature = l + rr - 2 * best.score;
+    best.delta = curvature < -1e-6 ? Math.max(-1, Math.min(1, (l - rr) / curvature)) : 0; // sub-column peak
+    return best;
+  }
+  /* Match two strips. Returns the best peak (angle, correlation, margin, ok, weight) plus up to three
+     distinct candidate peaks (`peaks`), since on repeated motifs the true shift is not always first. */
   function pair(first, second) {
     var limit = Math.round(COLS * 0.36), coarse = [];
-    for (var shift = -200; shift <= 200; shift += 2) coarse.push({ shift: shift, r: blockScore(first.columns, second.columns, shift, 0, limit) });
-    var order = coarse.slice().sort(function (p, q) { return q.r.score - p.r.score; }).slice(0, 4), best = null;
-    order.forEach(function (c) { // refine around the strongest coarse peaks, with vertical slack
-      for (var s = c.shift - 2; s <= c.shift + 2; s++) for (var dy = -3; dy <= 3; dy++) {
-        var r = blockScore(first.columns, second.columns, s, dy, limit);
-        if (!best || r.score > best.score) best = { score: r.score, shift: s, dy: dy, count: r.cells };
-      }
-    });
-    // sub-column peak by parabola on the refined neighbours
-    var l = blockScore(first.columns, second.columns, best.shift - 1, best.dy, limit).score, rr = blockScore(first.columns, second.columns, best.shift + 1, best.dy, limit).score;
-    var curvature = l + rr - 2 * best.score, delta = curvature < -1e-6 ? Math.max(-1, Math.min(1, (l - rr) / curvature)) : 0;
-    // Distinctiveness: the best peak must clearly beat every shift more than ~8 degrees away from it.
-    var rival = -1;
-    coarse.forEach(function (c) { if (Math.abs(c.shift - best.shift) > 16 && c.r.score > rival) rival = c.r.score; });
-    var margin = best.score - rival, ok = best.score > 0.3 && margin > 0.08;
-    return { angle: (best.shift + delta) * Math.PI / (COLS - 1), correlation: best.score, dy: best.dy, margin: margin, ok: ok,
-      weight: ok ? (best.score - 0.2 + margin) * Math.sqrt(best.count / 40) : 0 };
+    for (var shift = -200; shift <= 200; shift += 2) coarse.push({ shift: shift, score: blockScore(first.columns, second.columns, shift, 0, limit).score });
+    var sorted = coarse.slice().sort(function (p, q) { return q.score - p.score; }), seeds = [];
+    for (var k = 0; k < sorted.length && seeds.length < 3; k++) {
+      if (sorted[k].score <= 0.2) break;
+      if (seeds.every(function (s) { return Math.abs(s.shift - sorted[k].shift) > 16; })) seeds.push(sorted[k]);
+    }
+    if (!seeds.length) seeds.push(sorted[0]);
+    var peaks = seeds.map(function (c) {
+      var b = refinePeak(first, second, c.shift, limit), rival = -1;
+      // Distinctiveness: how clearly this peak beats every shift more than ~8 degrees away from it.
+      coarse.forEach(function (q) { if (Math.abs(q.shift - b.shift) > 16 && q.score > rival) rival = q.score; });
+      var margin = b.score - rival, ok = b.score > 0.3 && margin > 0.08;
+      return { angle: (b.shift + b.delta) * Math.PI / (COLS - 1), correlation: b.score, dy: b.dy, margin: margin, ok: ok, count: b.count,
+        weight: (b.score > 0.3 ? b.score - 0.2 + Math.max(0, margin) : 0) * Math.sqrt(b.count / 40) };
+    }).sort(function (p, q) { return q.correlation - p.correlation; });
+    var top = peaks[0];
+    return { angle: top.angle, correlation: top.correlation, dy: top.dy, margin: top.margin, ok: top.ok,
+      weight: top.ok ? top.weight : 0, peaks: peaks };
   }
   function edgeOf(matches, choices, i, j) { return i < j ? matches[i][j][choices[i]][choices[j]] : matches[j][i][choices[j]][choices[i]]; }
   // Greedy maximum spanning tree grown from one root photo; rotations relative to the root.
@@ -151,6 +165,45 @@ var ROLLREGISTER = (function () {
     var shift = placed[0];
     for (var q = 0; q < N; q++) rotations[q] = wrap(placed[q] - shift);
   }
+  /* Sequence prior: museum sets are photographed in order while the vessel turns, so photo i and
+     i+1 are angular neighbours and every step turns the same way. For each turning direction, chain
+     the photos in order using, for each neighbouring pair, the strongest candidate peak that turns
+     that way by a plausible step (15-150 degrees); close the loop when the last photo matches back to
+     the first. Returns null when no complete chain exists (e.g. shuffled photos). */
+  function sequenceSolve(choices, matches, N) {
+    var MIN = 15 * Math.PI / 180, MAX = 150 * Math.PI / 180, best = null;
+    function stepPeak(a, b, dir) { // best peak giving a turn from a to b in direction dir
+      var e = a < b ? matches[a][b][choices[a]][choices[b]] : matches[b][a][choices[b]][choices[a]], sign = a < b ? 1 : -1, pick = null;
+      (e.peaks || [e]).forEach(function (p) {
+        var step = dir * sign * p.angle;
+        if (p.correlation > 0.3 && step >= MIN && step <= MAX && (!pick || p.correlation > pick.p.correlation)) pick = { p: p, step: step };
+      });
+      return pick;
+    }
+    [1, -1].forEach(function (dir) {
+      var steps = [], score = 0, missing = -1;
+      for (var i = 0; i < N - 1; i++) {
+        var sp = stepPeak(i, i + 1, dir);
+        if (!sp) { if (missing >= 0) return; missing = i; steps.push(0); continue; } // allow one gap
+        steps.push(sp.step); score += sp.p.correlation;
+      }
+      var close = N >= 3 ? stepPeak(N - 1, 0, dir) : null, total = steps.reduce(function (x, y) { return x + y; }, 0);
+      if (missing >= 0) {
+        // One neighbouring pair barely overlaps (wide step): if the loop closes, that step is what's left of 360.
+        if (!close) return;
+        var rest = TAU - total - close.step;
+        if (rest < MIN || rest > Math.PI) return;
+        steps[missing] = rest; score += close.p.correlation;
+      } else if (close) {
+        var sum = total + close.step, scale = TAU / sum;
+        if (Math.abs(scale - 1) <= 0.2) { steps = steps.map(function (x) { return x * scale; }); score += close.p.correlation; }
+      } else if (total >= TAU) return; // an open chain cannot wrap past a full turn
+      var rotations = [0];
+      for (var k = 0; k < steps.length; k++) rotations.push(wrap(rotations[k] + dir * steps[k]));
+      if (!best || score > best.score) best = { score: score, rotations: rotations, dir: dir, closed: !!close };
+    });
+    return best;
+  }
   function estimate(images) {
     if (images.length < 2) return { connected: false, cameras: images.map(function () { return null; }), rotations: [0], confidence: 0 };
     var rawModels = images.map(function (image) { return ROLLCAMERA.candidates(image.cv, image.b); });
@@ -202,6 +255,9 @@ var ROLLREGISTER = (function () {
     }
     solutions.sort(function (a, b) { return b.graph.score - a.graph.score; });
     var best = solutions[0], confidence = best.graph.edges.length ? median(best.graph.edges.map(function (e) { return e.correlation; })) : 0;
+    // Prefer the photo-order chain when one exists (see sequenceSolve); keep the graph solve otherwise.
+    var seq = sequenceSolve(best.choices, matches, images.length), method = "graph";
+    if (seq) { best = { choices: best.choices, graph: { connected: true, rotations: seq.rotations, edges: best.graph.edges } }; method = seq.closed ? "sequence (closed loop)" : "sequence"; }
     // Best match per photo pair (any camera hypotheses): explains disconnected graphs.
     var pairs = [];
     for (var a = 0; a < images.length; a++) for (var c2 = a + 1; c2 < images.length; c2++) {
@@ -209,7 +265,7 @@ var ROLLREGISTER = (function () {
       pairs.push({ i: a, j: c2, correlation: top.correlation, margin: top.margin, ok: top.ok, angleDeg: top.angle * 180 / Math.PI });
     }
     return { connected: best.graph.connected, cameras: best.choices.map(function (c, i) { return options[i][c].model; }),
-      rotations: best.graph.rotations, confidence: confidence, pairs: pairs };
+      rotations: best.graph.rotations, confidence: confidence, pairs: pairs, method: method };
   }
   function compose(images, registration, strips, opts) {
     opts = opts || {};
