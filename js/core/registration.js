@@ -328,6 +328,51 @@ var ROLLREGISTER = (function () {
     return { pairs: pairs, minNCC: nccs.length ? Math.min.apply(null, nccs) : null,
       meanNCC: nccs.length ? nccs.reduce(function (x, y) { return x + y; }, 0) / nccs.length : null };
   }
+  /* Camera refinement: the remaining ghosting comes from each photo's angle mapping, not its
+     placement. For each photo (coordinate descent, two passes), try small changes to the camera
+     distance (with focal length rescaled so the vessel's width in the photo stays fixed) and to the
+     axis position (cx), re-flatten a small strip, and keep the change if its overlaps with all
+     other photos agree better at the best rotation within +-3 degrees. Mutates registration. */
+  function refineCameras(images, registration) {
+    var N = images.length, cams = registration.cameras, rot = registration.rotations, D = Math.PI / 180;
+    var inputs = images.map(function (im) { return im.cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, im.cv.width, im.cv.height); });
+    function mapFor(i, cam) {
+      var strip = ROLLCAMERA.flatten(images[i].cv, cam, hGeom(images[i].b).r, { width: COLS, height: 120, bounds: images[i].b, rectify: true, input: inputs[i] });
+      return { W: COLS, H: ROWS, v: describe(strip) };
+    }
+    var maps = images.map(function (_, i) { return mapFor(i, cams[i]); });
+    function agreement(i, map, r, lim) {
+      var s = 0, w = 0;
+      for (var j = 0; j < N; j++) if (j !== i) {
+        var o = overlapNCC(map, maps[j], r, rot[j], lim[i], lim[j]);
+        if (o.ncc !== null && o.cells >= 300) { s += o.ncc * o.cells; w += o.cells; }
+      }
+      return w ? s / w : null;
+    }
+    function bestRotation(i, map, lim) {
+      var best = { score: agreement(i, map, rot[i], lim), r: rot[i] };
+      if (i === 0 || best.score === null) return best;
+      for (var d = -3; d <= 3.0001; d += 0.5) { var v = agreement(i, map, rot[i] + d * D, lim); if (v !== null && v > best.score) best = { score: v, r: rot[i] + d * D }; }
+      return best;
+    }
+    for (var pass = 0; pass < 2; pass++) for (var i = 0; i < N; i++) {
+      var cam = cams[i]; if (!cam) continue;
+      var lim = limitsOf(images, registration), cur = bestRotation(i, maps[i], lim), bestCam = cam, bestMap = maps[i];
+      if (cur.score === null) continue;
+      var w = images[i].cv.width;
+      [0.85, 0.92, 1, 1.08, 1.17].forEach(function (k) {
+        [-0.02, 0, 0.02].forEach(function (dx) {
+          if (k === 1 && dx === 0) return;
+          var d2 = Math.max(1.3, cam.distance * k), f2 = cam.focal * Math.sqrt(d2 * d2 - 1) / Math.sqrt(cam.distance * cam.distance - 1);
+          var trial = Object.assign({}, cam, { distance: d2, focal: f2, cx: cam.cx + dx * w });
+          var save = cams[i]; cams[i] = trial; var lim2 = limitsOf(images, registration); cams[i] = save;
+          var m = mapFor(i, trial), b = bestRotation(i, m, lim2);
+          if (b.score !== null && b.score > cur.score + 0.005) { cur = b; bestCam = trial; bestMap = m; }
+        });
+      });
+      cams[i] = bestCam; maps[i] = bestMap; rot[i] = wrap(cur.r);
+    }
+  }
   function compose(images, registration, strips, opts) {
     opts = opts || {};
     if (!registration.connected || strips.length !== images.length) return null;
@@ -381,5 +426,5 @@ var ROLLREGISTER = (function () {
     ctx.putImageData(result, 0, 0);
     return { canvas: output, coveragePct: 100 * count / (W * H), start: start, span: span };
   }
-  return { estimate: estimate, compose: compose, refine: refine, wrap: wrap, _dbg: { detailMap: detailMap, overlapNCC: overlapNCC, limitsOf: limitsOf } };
+  return { estimate: estimate, compose: compose, refine: refine, refineCameras: refineCameras, wrap: wrap, _dbg: { detailMap: detailMap, overlapNCC: overlapNCC, limitsOf: limitsOf } };
 })();

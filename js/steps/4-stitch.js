@@ -171,6 +171,9 @@ function localStitch() {
   var t0 = performance.now(), reg = ROLLREGISTER.estimate(inputs);
   logMsg(t("localStitch") + ": " + (reg.connected ? "ok" : "not connected") + " (" + Math.round(performance.now() - t0) + " ms)");
   if (!reg.connected) return null;
+  var t2 = performance.now();
+  ROLLREGISTER.refineCameras(inputs, reg);
+  logMsg("Camera refinement (" + Math.round(performance.now() - t2) + " ms)");
   var strips = imgs.map(function (im, i) {
     return ROLLCAMERA.flatten(im.cv, reg.cameras[i], hGeom(im.b).r, { bounds: im.b, rectify: true });
   });
