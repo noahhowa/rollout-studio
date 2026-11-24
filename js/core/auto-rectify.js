@@ -5,7 +5,91 @@
 "use strict";
 var AUTORECT = (function () {
   function median(a) { var s = a.slice().sort(function (x, y) { return x - y; }); return s.length ? s[s.length >> 1] : 0; }
+  // Each rim can drift independently of the silhouette, especially on a flared vessel.
+  // Match red–green profiles near each rim: warm paint stands out even when lighting varies.
+  function rimOffsets(d, bg, W, H, outT, outB, first, last) {
+    const rows = 160, width = Math.max(6, Math.round((last - first + 1) / 50));
+    const profiles = [];
+    for (let left = first; left <= last; left += width) {
+      const right = Math.min(last, left + width - 1);
+      const sum = new Float32Array(rows), count = new Uint16Array(rows);
+      for (let col = left; col <= right; col++) {
+        if (!Number.isFinite(outT[col])) continue;
+        const height = outB[col] - outT[col];
+        for (let row = 0; row < rows; row++) {
+          const y = outT[col] + row / (rows - 1) * height;
+          const y0 = Math.floor(y), f = y - y0, pixel = y0 * W + col;
+          if (y0 < 0 || y0 >= H - 1 || bg[pixel] || bg[pixel + W]) continue;
+          const a = 4 * pixel, b = a + 4 * W;
+          sum[row] += (1 - f) * (d[a] - d[a + 1]) + f * (d[b] - d[b + 1]);
+          count[row]++;
+        }
+      }
+      profiles.push(sum.map((v, row) => count[row] >= (right - left + 1) / 2 ? v / count[row] : NaN));
+    }
+    if (profiles.length < 5) return null;
+    const reference = profiles[0].map((_, row) => {
+      let sum = 0, count = 0;
+      for (const profile of profiles) {
+        if (!Number.isFinite(profile[row])) continue;
+        sum += profile[row];
+        count++;
+      }
+      return count > profiles.length / 2 ? sum / count : NaN;
+    });
+
+    const firstRow = Math.round(0.015 * rows), lastRow = Math.round(0.22 * rows);
+    const maxShift = Math.round(0.05 * rows), radius = 2;
+    const rims = [false, true].map(bottom => {
+      const lo = bottom ? rows - 1 - lastRow : firstRow;
+      const hi = bottom ? rows - 1 - firstRow : lastRow;
+      const matches = profiles.map(profile => {
+        let best = 0, shift = 0, confidence = 0;
+        for (let offset = -maxShift; offset <= maxShift; offset++) {
+          let a = 0, b = 0, aa = 0, bb = 0, ab = 0, count = 0;
+          for (let row = lo; row <= hi; row++) {
+            const x = profile[row + offset], y = reference[row];
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+            a += x; b += y; aa += x * x; bb += y * y; ab += x * y; count++;
+          }
+          if (count < 0.8 * (hi - lo)) continue;
+          const varianceA = aa - a * a / count, varianceB = bb - b * b / count;
+          if (varianceA <= 0 || varianceB <= 0) continue;
+          const correlation = (ab - a * b / count) / Math.sqrt(varianceA * varianceB);
+          // Prefer staying near the outline when several offsets explain the same pattern.
+          const score = correlation - 0.15 * (offset / maxShift) ** 2;
+          if (score > best) { best = score; shift = offset / rows; confidence = correlation; }
+        }
+        return { shift, confidence };
+      });
+      return matches.map((_, i) => {
+        let shift = 0, mass = 0, total = 0;
+        for (let j = Math.max(0, i - radius); j <= Math.min(matches.length - 1, i + radius); j++) {
+          const kernel = radius + 1 - Math.abs(j - i);
+          const weight = kernel * matches[j].confidence;
+          shift += weight * matches[j].shift;
+          mass += weight;
+          total += kernel;
+        }
+        return { shift: mass ? shift / mass : 0, confidence: mass / total };
+      });
+    });
+
+    return (rim, col, prior) => {
+      const offsets = rims[rim];
+      const pos = Math.max(0, Math.min(offsets.length - 1, (col - first) / width - 0.5));
+      const i = Math.floor(pos), f = pos - i;
+      const a = offsets[i], b = offsets[Math.min(offsets.length - 1, i + 1)];
+      const shift = a.shift + f * (b.shift - a.shift);
+      const confidence = a.confidence + f * (b.confidence - a.confidence);
+      // Keep the brightness nudge as the prior where the rim has weak matches or
+      // is near the ragged ends, where neighbouring strips can only support one side.
+      const endWeight = Math.min(1, Math.min(col - first, last - col) / (0.08 * (last - first)));
+      return prior + 0.65 * endWeight * Math.min(1, confidence / 0.7) * (shift - prior);
+    };
+  }
   function bandLines(cv) {
+    api.reason = null;
     var sc = Math.min(1, 800 / cv.width), W = Math.max(10, Math.round(cv.width * sc)), H = Math.max(10, Math.round(cv.height * sc));
     var c = document.createElement("canvas"); c.width = W; c.height = H;
     var x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(cv, 0, 0, W, H);
@@ -35,95 +119,96 @@ var AUTORECT = (function () {
       var vals = []; for (var k = -P.win; k <= P.win; k++) { var cc = col0 + k; if (cc >= 0 && cc < W && arr[cc] >= 0 && bots[cc] - tops[cc] >= 0.6 * typical) vals.push(arr[cc]); }
       return vals.length ? median(vals) : null;
     }
-    var first = valid[0], last = valid[valid.length - 1], n = P.samples, top = [], bot = [], inset = 0.01 * typical;
+    var first = valid[0], last = valid[valid.length - 1], n = P.samples, inset = 0.01 * typical;
     // Smoothed outline per column (used as the search region for painted lines, and as fallback).
     var outT = new Float32Array(W).fill(NaN), outB = new Float32Array(W).fill(NaN);
     for (col = first; col <= last; col++) { var tt = smooth(tops, col), bb = smooth(bots, col); if (tt !== null && bb !== null) { outT[col] = tt; outB[col] = bb; } }
-    /* Profile alignment in image coordinates. Every column of a rollout crosses the same painted
-       bands (rim, glyph band, frame lines, base) in the same vertical order. For each narrow slice of
-       columns, find the vertical shift d and stretch k that best align its brightness profile with a
-       reference profile from the middle of the band, comparing only content pixels (background
-       excluded, so the stitched outline and its glow carry no weight). Large shifts are searched so
-       a whole stitched piece sitting higher or lower is found; corrections are smoothed over only 3
-       slices so real steps between pieces are kept. Lines = the reference band edges mapped through
-       each slice's (d, k). */
-    function profAbs(c0, c1) { // mean luminance per row over content pixels (NaN where background)
-      var out = new Float32Array(H), cnt = new Float32Array(H);
-      for (var cc = c0; cc <= c1; cc++) for (var yy = 0; yy < H; yy++) if (!bg[yy * W + cc]) { out[yy] += lum[yy * W + cc]; cnt[yy]++; }
-      for (yy = 0; yy < H; yy++) out[yy] = cnt[yy] >= 0.5 * (c1 - c0 + 1) ? out[yy] / cnt[yy] : NaN;
-      return out;
-    }
-    function ncc(pr, ref, d, k, c0r) { // NaN-aware NCC of pr(y) vs ref((y - d - c0r)/k + c0r)
-      var sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0, nn = 0;
-      for (var yy = 0; yy < H; yy += 1) {
-        var a = pr[yy]; if (a !== a) continue;
-        var yr = (yy - d - c0r) / k + c0r, y0 = Math.floor(yr); if (y0 < 0 || y0 >= H - 1) continue;
-        var f = yr - y0, r0 = ref[y0], r1 = ref[y0 + 1]; if (r0 !== r0 || r1 !== r1) continue;
-        var bv = r0 * (1 - f) + r1 * f;
-        sa += a; sb += bv; saa += a * a; sbb += bv * bv; sab += a * bv; nn++;
+    // Historical whole-band alignment, used by the opt-in PROFILE=1 benchmark.
+    function experimentalProfile() {
+      function profAbs(c0, c1) { // mean luminance per row over content pixels (NaN where background)
+        var out = new Float32Array(H), cnt = new Float32Array(H);
+        for (var cc = c0; cc <= c1; cc++) for (var yy = 0; yy < H; yy++) if (!bg[yy * W + cc]) { out[yy] += lum[yy * W + cc]; cnt[yy]++; }
+        for (yy = 0; yy < H; yy++) out[yy] = cnt[yy] >= 0.5 * (c1 - c0 + 1) ? out[yy] / cnt[yy] : NaN;
+        return out;
       }
-      if (nn < 0.3 * typical) return -2;
-      var cov = sab / nn - (sa / nn) * (sb / nn), va = saa / nn - (sa / nn) * (sa / nn), vb = sbb / nn - (sb / nn) * (sb / nn);
-      return va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : -2;
-    }
-    var BW = Math.max(4, Math.round((last - first) / 80)), blocks = [];
-    for (var c5 = first; c5 + BW <= last; c5 += BW) blocks.push({ c0: c5, c1: c5 + BW - 1, mid: c5 + BW / 2, d: 0, k: 1, ok: false });
-    var midB = blocks.slice(Math.floor(blocks.length * 0.4), Math.ceil(blocks.length * 0.6));
-    var refT = median(midB.map(function (bl) { return outT[Math.round(bl.mid)]; })), refB = median(midB.map(function (bl) { return outB[Math.round(bl.mid)]; }));
-    var c0r = (refT + refB) / 2, ref = profAbs(midB[0].c0, midB[midB.length - 1].c1);
-    var maxD = Math.round(0.3 * typical);
-    for (var iter = 0; iter < 2; iter++) {
-      blocks.forEach(function (bl) {
-        var pr = profAbs(bl.c0, bl.c1), best = -2, bd = 0, bk = 1;
-        for (var k5 = 0.8; k5 <= 1.2501; k5 += 0.025) for (var d5 = -maxD; d5 <= maxD; d5 += 1) {
-          var v = ncc(pr, ref, d5, k5, c0r); if (v > best) { best = v; bd = d5; bk = k5; }
+      function ncc(pr, ref, d, k, c0r) { // NaN-aware NCC of pr(y) vs ref((y - d - c0r)/k + c0r)
+        var sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0, nn = 0;
+        for (var yy = 0; yy < H; yy += 1) {
+          var a = pr[yy]; if (a !== a) continue;
+          var yr = (yy - d - c0r) / k + c0r, y0 = Math.floor(yr); if (y0 < 0 || y0 >= H - 1) continue;
+          var f = yr - y0, r0 = ref[y0], r1 = ref[y0 + 1]; if (r0 !== r0 || r1 !== r1) continue;
+          var bv = r0 * (1 - f) + r1 * f;
+          sa += a; sb += bv; saa += a * a; sbb += bv * bv; sab += a * bv; nn++;
         }
-        // refine: stretch in 0.5% steps, shift in 0.25 px steps (coarse steps made the edges wobble)
-        var cd = bd, ck = bk;
-        for (var k6 = ck - 0.025; k6 <= ck + 0.0251; k6 += 0.005) for (var d6 = cd - 1.5; d6 <= cd + 1.51; d6 += 0.25) {
-          var v2 = ncc(pr, ref, d6, k6, c0r); if (v2 > best) { best = v2; bd = d6; bk = k6; }
-        }
-        bl.d = bd; bl.k = bk; bl.score = best; bl.ok = best > 0.5;
-      });
-      // Outliers: a slice far from the median of its wider neighbourhood (+-4 slices) takes that median.
-      // A real step between stitched pieces spans many slices, so it survives.
-      var med9 = blocks.map(function (bl, i7) {
-        var dd = [], kk = [];
-        for (var j7 = Math.max(0, i7 - 4); j7 <= Math.min(blocks.length - 1, i7 + 4); j7++) if (blocks[j7].ok) { dd.push(blocks[j7].d); kk.push(blocks[j7].k); }
-        return dd.length ? { d: median(dd), k: median(kk) } : null;
-      });
-      blocks.forEach(function (bl, i7) {
-        var m = med9[i7]; if (!m) return;
-        // slices that matched poorly, or disagree sharply with their neighbourhood, take its values
-        if (!bl.ok || Math.abs(bl.d - m.d) > 0.05 * typical || Math.abs(bl.k - m.k) > 0.05) { bl.d = m.d; bl.k = m.k; bl.ok = true; }
-      });
-      // Smooth along the band with a triangular moving average (+-4 slices), weighted by match quality.
-      // A median let neighbouring slices jump between values, which made the edges ripple.
-      var sm = blocks.map(function (bl, i8) {
-        var sd = 0, skk = 0, sw = 0;
-        for (var j8 = Math.max(0, i8 - 4); j8 <= Math.min(blocks.length - 1, i8 + 4); j8++) {
-          if (!blocks[j8].ok) continue;
-          var w = (5 - Math.abs(j8 - i8)) * Math.max(0.05, blocks[j8].score || 0.5);
-          sd += w * blocks[j8].d; skk += w * blocks[j8].k; sw += w;
-        }
-        return sw ? { d: sd / sw, k: skk / sw, ok: true } : { d: 0, k: 1, ok: false };
-      });
-      blocks.forEach(function (bl, i9) { bl.d = sm[i9].d; bl.k = sm[i9].k; bl.ok = sm[i9].ok; });
-      if (iter === 0) { // reference = average of aligned good profiles (back-mapped into reference rows)
-        var acc = new Float32Array(H), na = new Float32Array(H);
+        if (nn < 0.3 * typical) return -2;
+        var cov = sab / nn - (sa / nn) * (sb / nn), va = saa / nn - (sa / nn) * (sa / nn), vb = sbb / nn - (sb / nn) * (sb / nn);
+        return va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : -2;
+      }
+      var BW = Math.max(4, Math.round((last - first) / 80)), blocks = [];
+      for (var c5 = first; c5 + BW <= last; c5 += BW) blocks.push({ c0: c5, c1: c5 + BW - 1, mid: c5 + BW / 2, d: 0, k: 1, ok: false });
+      if (!blocks.length) return null;
+      var midB = blocks.slice(Math.floor(blocks.length * 0.4), Math.ceil(blocks.length * 0.6));
+      var refT = median(midB.map(function (bl) { return outT[Math.round(bl.mid)]; })), refB = median(midB.map(function (bl) { return outB[Math.round(bl.mid)]; }));
+      var c0r = (refT + refB) / 2, ref = profAbs(midB[0].c0, midB[midB.length - 1].c1);
+      var maxD = Math.round(0.3 * typical);
+      for (var iter = 0; iter < 2; iter++) {
         blocks.forEach(function (bl) {
-          if (!bl.ok) return; var pr = profAbs(bl.c0, bl.c1);
-          for (var yr = 0; yr < H; yr++) { var yy = Math.round((yr - c0r) * bl.k + c0r + bl.d); if (yy >= 0 && yy < H && pr[yy] === pr[yy]) { acc[yr] += pr[yy]; na[yr]++; } }
+          var pr = profAbs(bl.c0, bl.c1), best = -2, bd = 0, bk = 1;
+          for (var k5 = 0.8; k5 <= 1.2501; k5 += 0.025) for (var d5 = -maxD; d5 <= maxD; d5 += 1) {
+            var v = ncc(pr, ref, d5, k5, c0r); if (v > best) { best = v; bd = d5; bk = k5; }
+          }
+          // refine: stretch in 0.5% steps, shift in 0.25 px steps (coarse steps made the edges wobble)
+          var cd = bd, ck = bk;
+          for (var k6 = ck - 0.025; k6 <= ck + 0.0251; k6 += 0.005) for (var d6 = cd - 1.5; d6 <= cd + 1.51; d6 += 0.25) {
+            var v2 = ncc(pr, ref, d6, k6, c0r); if (v2 > best) { best = v2; bd = d6; bk = k6; }
+          }
+          bl.d = bd; bl.k = bk; bl.score = best; bl.ok = best > 0.5;
         });
-        for (var yr2 = 0; yr2 < H; yr2++) ref[yr2] = na[yr2] >= 3 ? acc[yr2] / na[yr2] : NaN;
+        // Outliers: a slice far from the median of its wider neighbourhood (+-4 slices) takes that median.
+        // A real step between stitched pieces spans many slices, so it survives.
+        var med9 = blocks.map(function (bl, i7) {
+          var dd = [], kk = [];
+          for (var j7 = Math.max(0, i7 - 4); j7 <= Math.min(blocks.length - 1, i7 + 4); j7++) if (blocks[j7].ok) { dd.push(blocks[j7].d); kk.push(blocks[j7].k); }
+          return dd.length ? { d: median(dd), k: median(kk) } : null;
+        });
+        blocks.forEach(function (bl, i7) {
+          var m = med9[i7]; if (!m) return;
+          // slices that matched poorly, or disagree sharply with their neighbourhood, take its values
+          if (!bl.ok || Math.abs(bl.d - m.d) > 0.05 * typical || Math.abs(bl.k - m.k) > 0.05) { bl.d = m.d; bl.k = m.k; bl.ok = true; }
+        });
+        // Smooth along the band with a triangular moving average (+-4 slices), weighted by match quality.
+        // A median let neighbouring slices jump between values, which made the edges ripple.
+        var sm = blocks.map(function (bl, i8) {
+          var sd = 0, skk = 0, sw = 0;
+          for (var j8 = Math.max(0, i8 - 4); j8 <= Math.min(blocks.length - 1, i8 + 4); j8++) {
+            if (!blocks[j8].ok) continue;
+            var w = (5 - Math.abs(j8 - i8)) * Math.max(0.05, blocks[j8].score || 0.5);
+            sd += w * blocks[j8].d; skk += w * blocks[j8].k; sw += w;
+          }
+          return sw ? { d: sd / sw, k: skk / sw, ok: true } : { d: 0, k: 1, ok: false };
+        });
+        blocks.forEach(function (bl, i9) { bl.d = sm[i9].d; bl.k = sm[i9].k; bl.ok = sm[i9].ok; });
+        if (iter === 0) { // reference = average of aligned good profiles (back-mapped into reference rows)
+          var acc = new Float32Array(H), na = new Float32Array(H);
+          blocks.forEach(function (bl) {
+            if (!bl.ok) return; var pr = profAbs(bl.c0, bl.c1);
+            for (var yr = 0; yr < H; yr++) { var yy = Math.round((yr - c0r) * bl.k + c0r + bl.d); if (yy >= 0 && yy < H && pr[yy] === pr[yy]) { acc[yr] += pr[yy]; na[yr]++; } }
+          });
+          for (var yr2 = 0; yr2 < H; yr2++) ref[yr2] = na[yr2] >= 3 ? acc[yr2] / na[yr2] : NaN;
+        }
       }
+      var good = blocks.filter(function (bl) { return bl.ok; }).length;
+      api.painted = { blocks: blocks.length, aligned: good };
+      function corrAt(c6) { var bi = Math.max(0, Math.min(blocks.length - 1, Math.floor((c6 - first) / BW))); return blocks[bi]; }
+      if (good < 0.6 * blocks.length) return null;
+      return function (col) {
+        var correction = corrAt(col);
+        return {
+          top: (refT + inset - c0r) * correction.k + c0r + correction.d,
+          bot: (refB - inset - c0r) * correction.k + c0r + correction.d
+        };
+      };
     }
-    var good = blocks.filter(function (bl) { return bl.ok; }).length;
-    api.painted = { blocks: blocks.length, aligned: good };
-    function corrAt(c6) { var bi = Math.max(0, Math.min(blocks.length - 1, Math.floor((c6 - first) / BW))); return blocks[bi]; }
-    // Experimental and OFF by default: on the hand-labelled ground truth (scripts/eval-rectify.js)
-    // the outline-only lines scored 1.78% vs 4.57% for this alignment (no rectify: 3.78%).
-    var useProfile = !!api.experimentalProfile && good >= 0.6 * blocks.length, insetR = 0.01 * typical;
     /* Hybrid nudge (P.nudge): start from the outline lines, then shift/stretch each region slightly
        so the painted bands' brightness profile matches the band-wide reference. Corrections are
        relative to the outline, bounded (+-P.nudge of band height, +-P.nudge stretch) and smoothed
@@ -171,35 +256,79 @@ var AUTORECT = (function () {
       }
     }
     function nudgeAt(c7) { if (!nudge) return null; var bi = Math.max(0, Math.min(nudge.length - 1, Math.floor((c7 - first) / Math.max(6, Math.round((last - first) / 40))))); return nudge[bi]; }
-    for (var k2 = 0; k2 <= n; k2++) {
-      var cx = Math.round(first + (last - first) * k2 / n), t = smooth(tops, cx), b = smooth(bots, cx);
-      if (t === null || b === null) continue;
-      var ty = t + inset, byy = b - inset, ng = nudgeAt(cx);
-      if (ng && !useProfile) { var spn = b - t; ty = t + ((0.01 - 0.5) * ng.k + 0.5 + ng.sh) * spn; byy = t + ((0.99 - 0.5) * ng.k + 0.5 + ng.sh) * spn; }
-      if (useProfile) {
-        var cr2 = corrAt(cx);
-        ty = (refT + insetR - c0r) * cr2.k + c0r + cr2.d;
-        byy = (refB - insetR - c0r) * cr2.k + c0r + cr2.d;
+    function sampleLines(samples, offsetAt, profileAt) {
+      samples = Math.min(samples, last - first);
+      var top = [], bot = [];
+      for (var i = 0; i <= samples; i++) {
+        var col = Math.round(first + (last - first) * i / samples), t = outT[col], b = outB[col];
+        if (!Number.isFinite(t) || !Number.isFinite(b)) continue;
+        var ng = nudgeAt(col), span = b - t;
+        var topShift = ng ? ng.sh - 0.49 * (ng.k - 1) : 0;
+        var botShift = ng ? ng.sh + 0.49 * (ng.k - 1) : 0;
+        if (offsetAt) {
+          topShift = offsetAt(0, col, topShift);
+          botShift = offsetAt(1, col, botShift);
+        }
+        var topY = ng || offsetAt ? t + (0.01 + topShift) * span : t + inset;
+        var botY = ng || offsetAt ? t + (0.99 + botShift) * span : b - inset;
+        var profile = profileAt && profileAt(col);
+        top.push({ x: Math.round(col / sc), y: Math.round((profile ? profile.top : topY) / sc) });
+        bot.push({ x: Math.round(col / sc), y: Math.round((profile ? profile.bot : botY) / sc) });
       }
-      top.push({ x: Math.round(cx / sc), y: Math.round(ty / sc) });
-      bot.push({ x: Math.round(cx / sc), y: Math.round(byy / sc) });
+      return { top: top, bot: bot };
     }
-    // A real band edge moves smoothly. The panorama's ragged ends (corners of tilted pieces) are
-    // trimmed; a big jump anywhere in the interior means a bad detection.
+
     var lim = 0.25 * typical / sc;
-    // A stitched piece sitting higher or lower moves both lines together, which is real and must be
-    // followed; only a sudden change in band thickness (the two lines jumping differently) is bad.
-    function jump(k) { return Math.abs((top[k].y - top[k - 1].y) - (bot[k].y - bot[k - 1].y)) > lim; }
-    var trimmed = 0;
-    while (top.length > 2 && trimmed < 4 && jump(1)) { top.shift(); bot.shift(); trimmed++; }
-    while (top.length > 2 && trimmed < 8 && jump(top.length - 1)) { top.pop(); bot.pop(); trimmed++; }
-    for (var k3 = 1; k3 < top.length; k3++) if (jump(k3)) { api.reason = 'jagged at sample ' + k3; return null; }
-    // Only a roughly horizontal band is straightened. A strongly tilted or fragmented stitch (e.g. a
-    // failed one) is left to the user rather than traced along its diagonal edges.
-    function tilt(pts) { return Math.abs(Math.atan2(pts[pts.length - 1].y - pts[0].y, pts[pts.length - 1].x - pts[0].x)) * 180 / Math.PI; }
-    if (top.length >= 2 && (tilt(top) > 8 || tilt(bot) > 8)) { api.reason = "band too tilted (" + Math.round(Math.max(tilt(top), tilt(bot))) + " deg)"; return null; }
-    if (last - first < 0.6 * W) { api.reason = "band covers only part of the width"; return null; }
-    return top.length >= 2 ? { top: top, bot: bot } : null;
+    function tilt(first, last) {
+      return Math.abs(Math.atan2(last.y - first.y, last.x - first.x)) * 180 / Math.PI;
+    }
+    function outlineTilt(first, last, outline) {
+      var left = Math.round(first.x * sc), right = Math.round(last.x * sc);
+      // Stay clear of the one-sided median windows at the ends when measuring the outline slope.
+      var margin = Math.min(P.win, Math.floor((right - left) / 4));
+      var y0 = outline[left + margin], y1 = outline[right - margin];
+      if (!Number.isFinite(y0) || !Number.isFinite(y1)) {
+        margin = 0;
+        y0 = outline[left];
+        y1 = outline[right];
+      }
+      return tilt({ x: left + margin, y: y0 }, { x: right - margin, y: y1 });
+    }
+    function declineReason(lines) {
+      var top = lines.top, bot = lines.bot;
+      // Trim ragged ends. A seam can move both lines together, but a jump in thickness is suspect.
+      function jump(k) { return Math.abs((top[k].y - top[k - 1].y) - (bot[k].y - bot[k - 1].y)) > lim; }
+      var trimmed = 0;
+      while (top.length > 2 && trimmed < 4 && jump(1)) { top.shift(); bot.shift(); trimmed++; }
+      while (top.length > 2 && trimmed < 8 && jump(top.length - 1)) { top.pop(); bot.pop(); trimmed++; }
+      for (var k = 1; k < top.length; k++) if (jump(k)) return 'jagged at sample ' + k;
+      if (last - first < 0.6 * W) return 'band covers only part of the width';
+      if (top.length < 2) return 'too few samples';
+      var end = top.length - 1;
+      var angle = Math.max(tilt(top[0], top[end]), tilt(bot[0], bot[end]),
+        outlineTilt(top[0], top[end], outT), outlineTilt(bot[0], bot[end], outB));
+      if (angle > 8) return 'band too tilted (' + angle.toFixed(1) + ' deg)';
+      return null;
+    }
+
+    // A paint match cannot make a failed stitch eligible. Keep the original result if the
+    // refined lines introduce a thickness jump or tilt.
+    var baseline = sampleLines(n, null);
+    api.reason = declineReason(baseline);
+    if (api.reason) return null;
+    if (api.experimentalProfile) {
+      var profileAt = experimentalProfile();
+      if (!profileAt) return baseline;
+      var historical = sampleLines(n, null, profileAt);
+      api.reason = declineReason(historical);
+      return api.reason ? null : historical;
+    }
+    if (P.nudge <= 0) return baseline;
+    var offsetAt = rimOffsets(d, bg, W, H, outT, outB, first, last);
+    if (!offsetAt) return baseline;
+    // Resolve short seams that the coarser eligibility samples can straddle.
+    var refined = sampleLines(2 * n, offsetAt);
+    return declineReason(refined) ? baseline : refined;
   }
   // Tunable settings, scored with scripts/eval-rectify.js (PARAMS='{"dark":50}' to try others).
   var api = { bandLines: bandLines, reason: null, painted: null, params: { dark: 35, win: 20, samples: 32, nudge: 0.05, nudgeR: 3 } };
