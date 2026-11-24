@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Straight-Line Labeller</title>
+<style>
+:root{--bg:#fafafa;--fg:#111;--mut:#666;--card:#fff;--bd:#e5e5e5;--ok:#16a34a}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--fg:#eee;--mut:#999;--card:#1e1e1e;--bd:#333}}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px system-ui,sans-serif;margin:0;padding:12px 16px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+button,select{font:inherit;padding:6px 10px;border-radius:6px;border:1px solid var(--bd);background:var(--card);color:var(--fg);cursor:pointer}
+.hint{color:var(--mut);font-size:13px;margin:4px 0 8px;max-width:900px}
+canvas{max-width:100%;display:block;cursor:crosshair;touch-action:none;border-radius:4px;background:#000}
+.done{color:var(--ok);font-weight:600}.mut{color:var(--mut)}
+textarea{width:100%;height:70px;font:12px monospace;margin-top:8px;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:6px}
+</style>
+</head>
+<body>
+<div class="bar">
+  <select id="set"></select>
+  <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="file" id="localImg" accept="image/*" style="display:none"><button type="button" onclick="document.getElementById('localImg').click()">Open image…</button></label>
+  <button id="newLine">New line</button>
+  <button id="undo">Undo point</button>
+  <button id="clear">Clear panorama</button>
+  <span id="status" class="mut"></span>
+  <span id="count" class="mut"></span>
+  <button id="copy">Copy labels</button>
+</div>
+<div class="hint">Ground truth for auto-rectify. On each stitched panorama, click along a <b>painted line that should be straight</b> after rectifying: for example the lower edge of the red rim band, a glyph-band frame line, or the top of the base band. Click every few centimetres across the <b>whole width</b>, following the line through any steps between stitched pieces. <b>New line</b> starts another line (2 per panorama is ideal: one near the top, one near the bottom). Drag points to adjust. Labels are saved in this browser; use <b>Copy labels</b> and paste them into the chat.</div>
+<canvas id="cv"></canvas>
+<textarea id="out" readonly placeholder="Copied labels appear here too"></textarea>
+<script>
+"use strict";
+// Labels: {"<set>": {"lines": [[[x,y], ...], ...]}} with x,y normalised to 0..1 of the stitched image.
+var KEY = "rollout-line-labels-v1", labels = {};
+try { labels = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(labels)); } catch (e) {} updCount(); }
+var sets = [], cur = null, img = new Image(), cv = document.getElementById("cv"), ctx = cv.getContext("2d"), drag = null;
+var COLORS = ["#f97316", "#2563eb", "#16a34a", "#db2777", "#7c3aed"];
+function lab() { return labels[cur] || (labels[cur] = { lines: [[]] }); }
+async function load() {
+  var list = await (await fetch("../test-sets/stitched.json")).json();
+  sets = list.sets.filter(function (s) { return !s.failed; }); // failed stitches can't be labelled
+  var sel = document.getElementById("set");
+  sets.forEach(function (s) { var o = document.createElement("option"); o.value = s.id; o.textContent = s.id; sel.appendChild(o); });
+  sel.onchange = function () { show(sel.value); };
+  show(sets[0].id); updCount();
+}
+// Open a panorama from this computer (e.g. your own stitch): it stays in the browser; labels are
+// keyed "local:<file name>" and copied out with the rest.
+document.getElementById("localImg").onchange = function (e) {
+  var f = e.target.files[0]; if (!f) return;
+  var id = "local:" + f.name, url = URL.createObjectURL(f);
+  if (!sets.some(function (x) { return x.id === id; })) {
+    sets.push({ id: id, url: url });
+    var o = document.createElement("option"); o.value = id; o.textContent = id; document.getElementById("set").appendChild(o);
+  } else sets.find(function (x) { return x.id === id; }).url = url;
+  document.getElementById("set").value = id; show(id);
+};
+function show(id) { cur = id; var s = sets.find(function (x) { return x.id === id; }); img.onload = function () { cv.width = img.naturalWidth; cv.height = img.naturalHeight; draw(); }; img.src = s.url || "../" + s.file; }
+function draw() {
+  ctx.drawImage(img, 0, 0);
+  var L = labels[cur], r = Math.max(4, cv.width / 300);
+  (L ? L.lines : []).forEach(function (line, li) {
+    var col = COLORS[li % COLORS.length]; ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = r / 2;
+    var pts = line.slice().sort(function (a, b) { return a[0] - b[0]; }).map(function (p) { return [p[0] * cv.width, p[1] * cv.height]; });
+    if (pts.length > 1) { ctx.beginPath(); pts.forEach(function (p, i) { i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }); ctx.stroke(); }
+    pts.forEach(function (p) { ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7); ctx.fill(); });
+  });
+  var n = L ? L.lines.filter(function (l) { return l.length >= 2; }).length : 0;
+  document.getElementById("status").innerHTML = n ? '<span class="done">' + n + " line" + (n > 1 ? "s" : "") + "</span>" : "no lines yet";
+}
+function evPt(e) { var b = cv.getBoundingClientRect(); return [(e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height]; }
+cv.addEventListener("pointerdown", function (e) {
+  var p = evPt(e), L = lab();
+  for (var li = 0; li < L.lines.length; li++) for (var i = 0; i < L.lines[li].length; i++) {
+    var q = L.lines[li][i];
+    if (Math.hypot((q[0] - p[0]) * cv.width, (q[1] - p[1]) * cv.height) < cv.width / 120) { drag = [li, i]; cv.setPointerCapture(e.pointerId); return; }
+  }
+  L.lines[L.lines.length - 1].push(p); save(); draw();
+});
+cv.addEventListener("pointermove", function (e) { if (!drag) return; lab().lines[drag[0]][drag[1]] = evPt(e); draw(); });
+cv.addEventListener("pointerup", function () { if (drag) { drag = null; save(); } });
+document.getElementById("newLine").onclick = function () { var L = lab(); if (L.lines[L.lines.length - 1].length) L.lines.push([]); save(); draw(); };
+document.getElementById("undo").onclick = function () { var L = lab(), last = L.lines[L.lines.length - 1]; if (last.length) last.pop(); else if (L.lines.length > 1) L.lines.pop(); save(); draw(); };
+document.getElementById("clear").onclick = function () { delete labels[cur]; save(); draw(); };
+function done() { return Object.keys(labels).filter(function (k) { return labels[k].lines.some(function (l) { return l.length >= 2; }); }); }
+function updCount() { document.getElementById("count").textContent = done().length + " panoramas labelled"; }
+document.getElementById("copy").onclick = function () {
+  var out = {}; done().forEach(function (k) { out[k] = { lines: labels[k].lines.filter(function (l) { return l.length >= 2; }) }; });
+  var txt = JSON.stringify(out); document.getElementById("out").value = txt;
+  try { navigator.clipboard.writeText(txt); } catch (e) {}
+};
+load();
+</script>
+</body>
+</html>

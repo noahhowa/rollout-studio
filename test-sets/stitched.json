@@ -1,0 +1,79 @@
+{
+ "_doc": "Stitched panoramas for auto-rectify ground truth (eval/label-lines.html, scripts/eval-rectify.js). Made with the app's normal Stitch step on the test photos. Only public-domain (LACMA) panoramas are committed; others stay local.",
+ "sets": [
+  {
+   "id": "lacma-140748",
+   "file": "test-sets/lacma-140748/stitched/hf.jpg",
+   "size": [
+    2000,
+    1009
+   ],
+   "source": "Hugging Face Space (upload order)"
+  },
+  {
+   "id": "lacma-168389",
+   "file": "test-sets/lacma-168389/stitched/hf.jpg",
+   "size": [
+    2000,
+    856
+   ],
+   "source": "Hugging Face Space (upload order)"
+  },
+  {
+   "id": "lacma-168399",
+   "file": "test-sets/lacma-168399/stitched/hf.jpg",
+   "size": [
+    2000,
+    1011
+   ],
+   "source": "Hugging Face Space (upload order)"
+  },
+  {
+   "id": "lacma-168499",
+   "file": "test-sets/lacma-168499/stitched/hf.jpg",
+   "size": [
+    2000,
+    799
+   ],
+   "source": "Hugging Face Space (upload order)"
+  },
+  {
+   "id": "lacma-168550",
+   "file": "test-sets/lacma-168550/stitched/hf.jpg",
+   "size": [
+    2000,
+    714
+   ],
+   "source": "Hugging Face Space (upload order)"
+  },
+  {
+   "id": "lacma-168564",
+   "file": "test-sets/lacma-168564/stitched/hf.jpg",
+   "size": [
+    2000,
+    1898
+   ],
+   "source": "Hugging Face Space (upload order)",
+   "failed": true,
+   "note": "Hugging Face stitch failed (pieces overlap at 30-45 degrees); not labelled. Auto-rectify should decline it."
+  },
+  {
+   "id": "lacma-168596",
+   "file": "test-sets/lacma-168596/stitched/hf.jpg",
+   "size": [
+    2000,
+    1052
+   ],
+   "source": "Hugging Face Space (upload order)"
+  },
+  {
+   "id": "lacma-168619",
+   "file": "test-sets/lacma-168619/stitched/hf.jpg",
+   "size": [
+    2000,
+    975
+   ],
+   "source": "Hugging Face Space (upload order)"
+  }
+ ]
+}

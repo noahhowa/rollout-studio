@@ -13,7 +13,7 @@ var AUTORECT = (function () {
     for (i = 0; i < W * H; i++) lum[i] = d[4 * i + 3] < 128 ? 0 : 0.299 * d[4 * i] + 0.587 * d[4 * i + 1] + 0.114 * d[4 * i + 2];
     // Background = dark pixels connected to the image border (flood fill). Dark paint inside the
     // band (rim bands, figures, outlines) is enclosed by the band, so it stays content.
-    var bg = new Uint8Array(W * H), stack = [], DARK = 35;
+    var P = api.params, bg = new Uint8Array(W * H), stack = [], DARK = P.dark;
     function seed(p) { if (!bg[p] && lum[p] < DARK) { bg[p] = 1; stack.push(p); } }
     for (col = 0; col < W; col++) { seed(col); seed((H - 1) * W + col); }
     for (y = 0; y < H; y++) { seed(y * W); seed(y * W + W - 1); }
@@ -31,11 +31,11 @@ var AUTORECT = (function () {
     var typical = median(lens); if (!typical) { api.reason = 'no content'; return null; }
     var valid = []; for (col = 0; col < W; col++) if (tops[col] >= 0 && bots[col] - tops[col] >= 0.6 * typical) valid.push(col);
     if (valid.length < W * 0.3) { api.reason = 'too few full-height columns: ' + valid.length + '/' + W + ', typical ' + typical; return null; }
-    function smooth(arr, col0) { // median of valid columns within +-6
-      var vals = []; for (var k = -6; k <= 6; k++) { var cc = col0 + k; if (cc >= 0 && cc < W && arr[cc] >= 0 && bots[cc] - tops[cc] >= 0.6 * typical) vals.push(arr[cc]); }
+    function smooth(arr, col0) { // median of valid columns within +-20 (about +-2.5% of width; tuned on the ground truth)
+      var vals = []; for (var k = -P.win; k <= P.win; k++) { var cc = col0 + k; if (cc >= 0 && cc < W && arr[cc] >= 0 && bots[cc] - tops[cc] >= 0.6 * typical) vals.push(arr[cc]); }
       return vals.length ? median(vals) : null;
     }
-    var first = valid[0], last = valid[valid.length - 1], n = 32, top = [], bot = [], inset = 0.01 * typical;
+    var first = valid[0], last = valid[valid.length - 1], n = P.samples, top = [], bot = [], inset = 0.01 * typical;
     // Smoothed outline per column (used as the search region for painted lines, and as fallback).
     var outT = new Float32Array(W).fill(NaN), outB = new Float32Array(W).fill(NaN);
     for (col = first; col <= last; col++) { var tt = smooth(tops, col), bb = smooth(bots, col); if (tt !== null && bb !== null) { outT[col] = tt; outB[col] = bb; } }
@@ -121,11 +121,61 @@ var AUTORECT = (function () {
     var good = blocks.filter(function (bl) { return bl.ok; }).length;
     api.painted = { blocks: blocks.length, aligned: good };
     function corrAt(c6) { var bi = Math.max(0, Math.min(blocks.length - 1, Math.floor((c6 - first) / BW))); return blocks[bi]; }
-    var useProfile = good >= 0.6 * blocks.length, insetR = 0.01 * typical;
+    // Experimental and OFF by default: on the hand-labelled ground truth (scripts/eval-rectify.js)
+    // the outline-only lines scored 1.78% vs 4.57% for this alignment (no rectify: 3.78%).
+    var useProfile = !!api.experimentalProfile && good >= 0.6 * blocks.length, insetR = 0.01 * typical;
+    /* Hybrid nudge (P.nudge): start from the outline lines, then shift/stretch each region slightly
+       so the painted bands' brightness profile matches the band-wide reference. Corrections are
+       relative to the outline, bounded (+-P.nudge of band height, +-P.nudge stretch) and smoothed
+       over ~15% of the width, so a piece whose painting sits a little high or low is corrected but
+       a false match cannot throw the line far. */
+    var nudge = null;
+    if (P.nudge > 0) {
+      var NV2 = 100, BW2 = Math.max(6, Math.round((last - first) / 40)), nb = [];
+      var profV = function (c0, c1, sh, kk) {
+        var o = new Float32Array(NV2), cn = new Float32Array(NV2);
+        for (var cc2 = c0; cc2 <= c1; cc2++) {
+          if (outT[cc2] !== outT[cc2]) continue;
+          var sp = outB[cc2] - outT[cc2];
+          for (var iv = 0; iv < NV2; iv++) {
+            var vv = (0.02 + 0.96 * iv / (NV2 - 1) - 0.5) * kk + 0.5 + sh, yy2 = Math.round(outT[cc2] + vv * sp);
+            if (yy2 < 0 || yy2 >= H || bg[yy2 * W + cc2]) continue;
+            o[iv] += lum[yy2 * W + cc2]; cn[iv]++;
+          }
+        }
+        var mm = 0, nn2 = 0; for (iv = 0; iv < NV2; iv++) if (cn[iv]) { o[iv] /= cn[iv]; mm += o[iv]; nn2++; }
+        if (nn2 < NV2 * 0.8) return null;
+        mm /= nn2; var vs2 = 0; for (iv = 0; iv < NV2; iv++) { o[iv] = cn[iv] ? o[iv] - mm : 0; vs2 += o[iv] * o[iv]; }
+        vs2 = Math.sqrt(vs2) || 1; for (iv = 0; iv < NV2; iv++) o[iv] /= vs2;
+        return o;
+      };
+      for (var cb = first; cb + BW2 <= last; cb += BW2) nb.push({ c0: cb, c1: cb + BW2 - 1, sh: 0, k: 1, w: 0 });
+      var refP = new Float32Array(NV2), nr = 0;
+      nb.forEach(function (bl) { var pr = profV(bl.c0, bl.c1, 0, 1); if (pr) { for (var iv = 0; iv < NV2; iv++) refP[iv] += pr[iv]; nr++; } });
+      if (nr >= 5) {
+        nb.forEach(function (bl) {
+          var best = -2;
+          for (var kk2 = 1 - P.nudge; kk2 <= 1 + P.nudge + 1e-6; kk2 += P.nudge / 4) for (var sh2 = -P.nudge; sh2 <= P.nudge + 1e-6; sh2 += P.nudge / 8) {
+            var pr = profV(bl.c0, bl.c1, sh2, kk2); if (!pr) continue;
+            var c = 0; for (var iv = 0; iv < NV2; iv++) c += pr[iv] * refP[iv];
+            if (c > best) { best = c; bl.sh = sh2; bl.k = kk2; }
+          }
+          bl.w = Math.max(0, best / nr);
+        });
+        var R = P.nudgeR; // smoothing radius in blocks (block = 1/40 of the band width)
+        nudge = nb.map(function (bl, i) {
+          var a = 0, b = 0, ww = 0;
+          for (var j = Math.max(0, i - R); j <= Math.min(nb.length - 1, i + R); j++) { var w = (R + 1 - Math.abs(j - i)) * nb[j].w; a += w * nb[j].sh; b += w * nb[j].k; ww += w; }
+          return ww ? { sh: a / ww, k: b / ww } : { sh: 0, k: 1 };
+        });
+      }
+    }
+    function nudgeAt(c7) { if (!nudge) return null; var bi = Math.max(0, Math.min(nudge.length - 1, Math.floor((c7 - first) / Math.max(6, Math.round((last - first) / 40))))); return nudge[bi]; }
     for (var k2 = 0; k2 <= n; k2++) {
       var cx = Math.round(first + (last - first) * k2 / n), t = smooth(tops, cx), b = smooth(bots, cx);
       if (t === null || b === null) continue;
-      var ty = t + inset, byy = b - inset;
+      var ty = t + inset, byy = b - inset, ng = nudgeAt(cx);
+      if (ng && !useProfile) { var spn = b - t; ty = t + ((0.01 - 0.5) * ng.k + 0.5 + ng.sh) * spn; byy = t + ((0.99 - 0.5) * ng.k + 0.5 + ng.sh) * spn; }
       if (useProfile) {
         var cr2 = corrAt(cx);
         ty = (refT + insetR - c0r) * cr2.k + c0r + cr2.d;
@@ -151,6 +201,7 @@ var AUTORECT = (function () {
     if (last - first < 0.6 * W) { api.reason = "band covers only part of the width"; return null; }
     return top.length >= 2 ? { top: top, bot: bot } : null;
   }
-  var api = { bandLines: bandLines, reason: null, painted: null };
+  // Tunable settings, scored with scripts/eval-rectify.js (PARAMS='{"dark":50}' to try others).
+  var api = { bandLines: bandLines, reason: null, painted: null, params: { dark: 35, win: 20, samples: 32, nudge: 0.05, nudgeR: 3 } };
   return api;
 })();
