@@ -5,50 +5,70 @@ var ROLLREGISTER = (function () {
   var TAU = 2 * Math.PI, COLS = 360, ROWS = 48;
   function wrap(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
   function median(a) { return a.slice().sort(function (x, y) { return x - y; })[a.length >> 1]; }
+  /* Strip descriptor: luminance with the slow shading removed (each photo is lit from its own
+     camera, so the same painted spot is shaded differently between photos), normalised per strip.
+     Cells without valid surface (alpha) are marked NaN. */
   function describe(cv) {
     var small = document.createElement("canvas"); small.width = COLS; small.height = ROWS;
-    small.getContext("2d").drawImage(cv, 0, 0, COLS, ROWS);
-    var d = small.getContext("2d").getImageData(0, 0, COLS, ROWS).data, columns = [];
-    for (var x = 0; x < COLS; x++) {
-      var values = [], average = 0, valid = 0;
-      for (var y = 4; y < ROWS - 4; y++) {
-        var i = 4 * (y * COLS + x), light = (d[i] + 2 * d[i + 1] + d[i + 2]) / 4;
-        values.push(light); average += light; if (d[i + 3] > 250) valid++;
+    var sctx = small.getContext("2d", { willReadFrequently: true }); sctx.drawImage(cv, 0, 0, COLS, ROWS);
+    var d = sctx.getImageData(0, 0, COLS, ROWS).data, L = new Float32Array(COLS * ROWS), ok = new Uint8Array(COLS * ROWS);
+    for (var i = 0; i < COLS * ROWS; i++) { L[i] = (d[4 * i] + 2 * d[4 * i + 1] + d[4 * i + 2]) / 4; ok[i] = d[4 * i + 3] > 250 ? 1 : 0; }
+    function blur(src, r) { // separable box blur over valid cells only
+      var tmp = new Float32Array(src.length), out = new Float32Array(src.length);
+      for (var y = 0; y < ROWS; y++) for (var x = 0; x < COLS; x++) {
+        var s = 0, n = 0; for (var k = -r; k <= r; k++) { var xx = x + k; if (xx >= 0 && xx < COLS && ok[y * COLS + xx]) { s += src[y * COLS + xx]; n++; } }
+        tmp[y * COLS + x] = n ? s / n : 0;
       }
-      average /= values.length; var length = 0;
-      for (var k = 0; k < values.length; k++) { values[k] -= average; length += values[k] * values[k]; }
-      length = Math.sqrt(length);
-      columns.push(length > 15 && valid >= 0.9 * values.length ? values.map(function (v) { return v / length; }) : null);
+      for (var x2 = 0; x2 < COLS; x2++) for (var y2 = 0; y2 < ROWS; y2++) {
+        var s2 = 0, n2 = 0; for (var k2 = -r; k2 <= r; k2++) { var yy = y2 + k2; if (yy >= 0 && yy < ROWS && ok[yy * COLS + x2]) { s2 += tmp[yy * COLS + x2]; n2++; } }
+        out[y2 * COLS + x2] = n2 ? s2 / n2 : 0;
+      }
+      return out;
     }
-    return columns;
+    var base = blur(L, 8), H = new Float32Array(COLS * ROWS), m = 0, n = 0;
+    for (i = 0; i < H.length; i++) if (ok[i]) { H[i] = L[i] - base[i]; m += H[i]; n++; }
+    m = n ? m / n : 0; var v = 0;
+    for (i = 0; i < H.length; i++) if (ok[i]) { H[i] -= m; v += H[i] * H[i]; }
+    v = Math.sqrt(v / Math.max(1, n)) || 1;
+    for (i = 0; i < H.length; i++) H[i] = ok[i] ? H[i] / v : NaN;
+    return H;
   }
-  function correlation(a, b) {
-    if (!a || !b) return null;
-    var value = 0; for (var i = 0; i < a.length; i++) value += a[i] * b[i]; return value;
+  /* Normalised cross-correlation of two strips' overlapping block for a horizontal shift (columns)
+     and a small vertical offset (rows), weighted towards each view's face-on centre. */
+  function blockScore(A, B, shift, dy, limit) {
+    var sab = 0, saa = 0, sbb = 0, sa = 0, sb = 0, sw = 0, cells = 0;
+    var x0 = Math.max(COLS / 2 - limit, shift + COLS / 2 - limit), x1 = Math.min(COLS / 2 + limit, shift + COLS / 2 + limit);
+    for (var x = Math.ceil(x0); x < x1; x += 2) {
+      var xb = x - shift, w = Math.cos((x / (COLS - 1) - 0.5) * Math.PI) * Math.cos((xb / (COLS - 1) - 0.5) * Math.PI);
+      for (var y = 4; y < ROWS - 4; y++) {
+        var a = A[y * COLS + x], b = B[(y + dy) * COLS + xb];
+        if (a !== a || b !== b) continue;
+        sab += w * a * b; saa += w * a * a; sbb += w * b * b; sa += w * a; sb += w * b; sw += w; cells++;
+      }
+    }
+    if (cells < 300 || sw <= 0) return { score: -1, cells: cells };
+    var cov = sab / sw - (sa / sw) * (sb / sw), va = saa / sw - (sa / sw) * (sa / sw), vb = sbb / sw - (sb / sw) * (sb / sw);
+    return { score: va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : -1, cells: cells };
   }
   function pair(first, second) {
-    var scores = [], best = null, limit = Math.round(COLS * 0.36);
-    for (var shift = -200; shift <= 200; shift += 2) {
-      var total = 0, weight = 0, count = 0;
-      for (var x = Math.max(COLS / 2 - limit, shift + COLS / 2 - limit); x < Math.min(COLS / 2 + limit, shift + COLS / 2 + limit); x += 3) {
-        var value = correlation(first.columns[x], second.columns[x - shift]);
-        if (value === null) continue;
-        var theta = (x / (COLS - 1) - 0.5) * Math.PI;
-        var other = ((x - shift) / (COLS - 1) - 0.5) * Math.PI;
-        var w = Math.cos(theta) * Math.cos(other);
-        total += w * value; weight += w; count++;
+    var limit = Math.round(COLS * 0.36), coarse = [];
+    for (var shift = -200; shift <= 200; shift += 2) coarse.push({ shift: shift, r: blockScore(first.columns, second.columns, shift, 0, limit) });
+    var order = coarse.slice().sort(function (p, q) { return q.r.score - p.r.score; }).slice(0, 4), best = null;
+    order.forEach(function (c) { // refine around the strongest coarse peaks, with vertical slack
+      for (var s = c.shift - 2; s <= c.shift + 2; s++) for (var dy = -3; dy <= 3; dy++) {
+        var r = blockScore(first.columns, second.columns, s, dy, limit);
+        if (!best || r.score > best.score) best = { score: r.score, shift: s, dy: dy, count: r.cells };
       }
-      var score = count >= 18 && weight > 0 ? total / weight : -1;
-      scores.push(score);
-      if (!best || score > best.score) best = { score: score, shift: shift, count: count, index: scores.length - 1 };
-    }
-    var delta = 0, index = best.index;
-    if (index > 0 && index < scores.length - 1) {
-      var l = scores[index - 1], r = scores[index + 1], curvature = l + r - 2 * best.score;
-      if (curvature < -1e-6) delta = Math.max(-1, Math.min(1, (l - r) / curvature));
-    }
-    return { angle: (best.shift + delta) * Math.PI / (COLS - 1), correlation: best.score,
-      weight: Math.max(0, best.score - 0.4) * Math.sqrt(best.count) };
+    });
+    // sub-column peak by parabola on the refined neighbours
+    var l = blockScore(first.columns, second.columns, best.shift - 1, best.dy, limit).score, rr = blockScore(first.columns, second.columns, best.shift + 1, best.dy, limit).score;
+    var curvature = l + rr - 2 * best.score, delta = curvature < -1e-6 ? Math.max(-1, Math.min(1, (l - rr) / curvature)) : 0;
+    // Distinctiveness: the best peak must clearly beat every shift more than ~8 degrees away from it.
+    var rival = -1;
+    coarse.forEach(function (c) { if (Math.abs(c.shift - best.shift) > 16 && c.r.score > rival) rival = c.r.score; });
+    var margin = best.score - rival, ok = best.score > 0.3 && margin > 0.08;
+    return { angle: (best.shift + delta) * Math.PI / (COLS - 1), correlation: best.score, dy: best.dy, margin: margin, ok: ok,
+      weight: ok ? (best.score - 0.2 + margin) * Math.sqrt(best.count / 40) : 0 };
   }
   function graph(choices, matches) {
     var N = choices.length, rotations = new Array(N).fill(null), used = [0], edges = [], score = 0;
@@ -61,7 +81,7 @@ var ROLLREGISTER = (function () {
           if (!best || edge.weight > best.edge.weight) best = { i: i, j: j, edge: edge, sign: i < j ? 1 : -1 };
         }
       });
-      if (!best || best.edge.correlation < 0.65) break;
+      if (!best || !best.edge.ok) break;
       rotations[best.j] = wrap(rotations[best.i] + best.sign * best.edge.angle);
       score += best.edge.weight; edges.push(best.edge); used.push(best.j);
     }
@@ -69,7 +89,7 @@ var ROLLREGISTER = (function () {
     var links = [];
     for (var i = 0; i < N; i++) for (var j = i + 1; j < N; j++) {
       var edge = matches[i][j][choices[i]][choices[j]], residual = Math.abs(wrap(rotations[j] - rotations[i] - edge.angle));
-      if (edge.correlation > 0.65) {
+      if (edge.ok) {
         score += edge.weight * Math.max(0, 1 - residual / 0.06);
         if (residual < 0.08) links.push({ i: i, j: j, edge: edge });
       }
@@ -139,8 +159,14 @@ var ROLLREGISTER = (function () {
     }
     solutions.sort(function (a, b) { return b.graph.score - a.graph.score; });
     var best = solutions[0], confidence = best.graph.edges.length ? median(best.graph.edges.map(function (e) { return e.correlation; })) : 0;
+    // Best match per photo pair (any camera hypotheses): explains disconnected graphs.
+    var pairs = [];
+    for (var a = 0; a < images.length; a++) for (var c2 = a + 1; c2 < images.length; c2++) {
+      var top = null; matches[a][c2].forEach(function (row) { row.forEach(function (m) { if (!top || m.correlation > top.correlation) top = m; }); });
+      pairs.push({ i: a, j: c2, correlation: top.correlation, margin: top.margin, ok: top.ok, angleDeg: top.angle * 180 / Math.PI });
+    }
     return { connected: best.graph.connected, cameras: best.choices.map(function (c, i) { return options[i][c].model; }),
-      rotations: best.graph.rotations, confidence: confidence };
+      rotations: best.graph.rotations, confidence: confidence, pairs: pairs };
   }
   function compose(images, registration, strips, opts) {
     opts = opts || {};
