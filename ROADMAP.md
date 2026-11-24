@@ -210,6 +210,21 @@ Two labelled top scores improve: `lacma-168564/04.jpg`, 5.777 → 5.060%H, and `
 
 On the new supplied PNG, the detected top middle moves from y=132.06 to y=148.83, following the visible red lip. This fixture has no user hand labels and is excluded from the aggregate label scores. `node scripts/check_top_rim.js` separately asserts broad corridors around the visible endpoints at 75%, 100% and 150% scale, repeated reads, a normal upload, and recovery from deliberately corrupted handles through Reset rims. The test passes, as does `node scripts/check_bottom_rims.js --include-real`. The corrected Map preview is written to `eval/out/top-rim-fix.png`. General tilted-cylinder camera geometry and the whole-rollout benchmark were not changed or rerun in this pass.
 
+### Preserve a curved top when refinement collapses
+
+The second supplied top-rim PNG (`top-rim-regression/photos/02.png`, 882 × 1102) reproduces another failure at original size. The initial mask fits a curved opening (work-size radius 113, depth 11.17), but refinement fits a narrow flat row (radius 73, depth approximately zero). The default now retains the initial top only when refinement loses both width (below 85% of the initial radius) and curvature (below 3% of its radius), while the initial opening has clear curvature (above 6% of its radius). This guard leaves all other top refinement behavior intact.
+
+| detector, 54 labelled cases | top %H | bottom %H | top ends %W | bottom ends %W | synthetic top %H | synthetic bottom %H |
+|---|---:|---:|---:|---:|---:|---:|
+| Before top stability guard | 1.442 | 1.932 | 4.018 | 4.074 | 3.225 | 5.511 |
+| Current default | 1.260 | 1.932 | 3.903 | 4.074 | 3.225 | 5.511 |
+
+Mean top error improves by 12.6%. `lacma-168564/04.jpg` improves 5.060 → 0.749%H, `/05.jpg` improves 4.852 → 0.103%H, and `lacma-168977/03.jpg` improves 2.344 → 1.568%H. Top endpoint error improves on the first two, but worsens 1.057 → 1.767%W on the last. The remaining 51 labelled cases, every bottom score, and all nine synthetic scores are unchanged. The same 25 Met labels remain unscored. Reproduce with `node scripts/eval.js --only "A2 before top stability,A2 two-class"`. No pipeline errors occurred.
+
+On the second supplied PNG, the front middle moves from y=153.58 to y=204.11 and the fitted ends expand to the visible opening. This fixture remains outside the hand-labelled aggregate benchmark. `node scripts/check_top_rim.js` now checks both supplied originals at three sizes, repeated reads, normal uploads and Reset for both cards. It asserts the front middle as well as both ends, preventing a flat back-edge fit from passing. The first fixture's existing endpoint tolerances are retained. The corrected two-photo preview is `eval/out/top-rim-fix.png`.
+
+The user's deployed URL is GitHub Pages. Its served detector and Map code matched the preceding merged patch, but the horizontal, extra-wide line in the first screenshot could not be reproduced on a fresh upload of that source. An already-open tab or cached script remains a possible explanation; this has not been confirmed in the user's browser. The application now versions the detector and Map script URLs so a refreshed page requests the updated assets after deployment. Saved rim coordinates still need Reset or re-upload to be recomputed. This follow-up does not change camera/registration geometry or rerun the whole-rollout benchmark.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):

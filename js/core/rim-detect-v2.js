@@ -441,6 +441,10 @@ var RIM2 = (function () {
       bot = initial.bot; f.yMax = initial.yMax;
     }
     if (!top || !bot) return null;
+    // A small refinement artifact can pull the top fit onto a narrow, flat row.
+    // Preserve a curved initial opening when both its width and curvature collapse.
+    if (opts.stableTop !== false && initial.top && top.a < 0.85 * initial.top.a &&
+        initial.top.b > 0.06 * initial.top.a && top.b < 0.03 * top.a) top = initial.top;
     var bottomLimit = f.yMax;
     if (fixBase && opts.recoverBaseCurve !== false) {
       var recovered = recoverBaseCurve(mask, S.W, S.H, bot, f.yMin, f.yMax);

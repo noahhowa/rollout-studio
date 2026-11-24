@@ -1,8 +1,27 @@
 {
   "id": "top-rim-regression",
-  "title": "Tilted shallow lip on a gray backdrop",
+  "title": "Tilted lip and collapsed curved opening on gray backdrops",
   "source": "User-supplied screenshot, 2026-11-24",
-  "images": [{ "file": "photos/01.png", "size": [852, 1142] }],
-  "evaluationScales": [0.75, 1, 1.5],
-  "note": "Fresh uploads place the nearly flat top above the tilted red lip. Separate regression assertions use visible edge positions; no user ground-truth rim labels have been assigned to this fixture."
+  "images": [
+    {
+      "file": "photos/01.png",
+      "size": [
+        852,
+        1142
+      ]
+    },
+    {
+      "file": "photos/02.png",
+      "size": [
+        882,
+        1102
+      ]
+    }
+  ],
+  "evaluationScales": [
+    0.75,
+    1,
+    1.5
+  ],
+  "note": "The first fixture has a high tilted lip. The second loses its curved opening during mask refinement at original size. Separate regression assertions use broad visible-edge corridors, not user ground-truth labels."
 }
