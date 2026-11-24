@@ -2,3 +2,4 @@ test-sets/*/photos/
 test-sets/*/rollout/
 eval/out/
 test-sets/*/details/
+__pycache__/
