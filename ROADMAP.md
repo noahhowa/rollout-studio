@@ -171,6 +171,12 @@ A circle seen by a pinhole camera is **exactly an ellipse**, which is the key st
 
 ## Phase 3: automatic depth/perspective correction
 
+### Automatic camera and rotation estimation checkpoint
+
+Draft implementation and handoff details are in `HANDOFF.md`, with the complete experiment recorded in `eval/automatic-rollout-results.json`. Camera candidates come from the two rim conics, shared vessel-height hypotheses stabilize per-photo fits, and overlapping painted detail jointly selects cameras and relative rotations. The estimator receives photographs and rim handles.
+
+Across all 12 synthetic sets, the detected-rim automatic pipeline improves mean full-rollout angular MAE from **3.154° to 0.945° (70.0%)**. The reframed procedural set scores 0.185°, including a photo with a cropped bottom rim. Real pca4sale photo matching remains disconnected, close-view rotation outliers remain, and production app integration is pending. These limitations are documented in the handoff and the draft PR.
+
 ### Yardstick milestone
 
 Implemented by `scripts/eval-rollout.js`, with fixtures in `eval/rollout-cases.json`. The committed `eval/rollout-baseline.json` records every pipeline, scene, reference, coverage figure, and runtime version. Browser output goes to `eval/out/rollout-scores.json` and the visual `eval/out/rollout-report.html`.

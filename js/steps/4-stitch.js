@@ -156,6 +156,28 @@ function setStepState(idx, state) {
   var steps = document.querySelectorAll("#stitchSteps .p-step");
   if (steps[idx]) steps[idx].className = "p-step " + state;
 }
+/* In-browser stitching: estimate each photo's camera from its rims, register rotations from
+   overlapping detail, and blend on the cylinder (js/core/camera.js, js/core/registration.js).
+   Returns a canvas, or null when the photos can't be lined up reliably (caller falls back to the
+   server). Uses each photo's crop from the Adjust step and the feather setting. */
+function localStitch() {
+  // Experimental: off by default until real-photo registration is reliable. Enable with ?local=1.
+  if (!/[?&]local=1\b/.test(location.search)) return null;
+  if (typeof ROLLREGISTER === "undefined" || imgs.length < 2) return null;
+  var inputs = imgs.map(function (im) { return { cv: im.cv, b: im.b, cropL: im.cropL, cropR: im.cropR }; });
+  var t0 = performance.now(), reg = ROLLREGISTER.estimate(inputs);
+  logMsg(t("localStitch") + ": " + (reg.connected ? "ok" : "not connected") + " (" + Math.round(performance.now() - t0) + " ms)");
+  if (!reg.connected) return null;
+  var strips = imgs.map(function (im, i) {
+    return ROLLCAMERA.flatten(im.cv, reg.cameras[i], hGeom(im.b).r, { bounds: im.b, rectify: true });
+  });
+  var out = ROLLREGISTER.compose(inputs, reg, strips, { feather: feather / 100 });
+  if (!out) return null;
+  if (out.span < 2 * Math.PI - 0.01) logMsg(t("coverageGap") + " (" + Math.round((out.span * 180) / Math.PI) + "\u00B0)");
+  return out.canvas;
+}
+function nextFrame() { return new Promise(function (r) { setTimeout(r, 30); }); }
+
 async function runStitch() {
   if (imgs.length < 2) return;
   stitchRunning = true;
@@ -195,10 +217,26 @@ async function runStitch() {
       N = strips.length;
     logMsg(N + " " + t("strips") + " (" + strips[0].width + "\u00D7" + strips[0].height + "px)");
     setStepState(0, "p-step done");
-    setStepState(1, "p-step active");
     setProgress(15);
-    var result;
-    if (N <= 5) {
+    await nextFrame(); // let the progress UI paint before the synchronous local solve
+    var result = null;
+    var tryLocal = /[?&]local=1\b/.test(location.search);
+    try { result = localStitch(); } catch (e) { logMsg("\u2717 local: " + e.message); result = null; }
+    if (result) {
+      logMsg(t("localDone") + result.width + "\u00D7" + result.height + "px");
+      var ps = document.querySelectorAll("#stitchSteps .p-step"); // relabel: nothing was uploaded
+      if (ps[1]) ps[1].lastChild.textContent = t("localStitch");
+      if (ps[2]) ps[2].style.display = "none";
+      setStepState(1, "p-step done");
+      setStepState(2, "p-step done");
+    } else {
+      if (!stitchRunning) return; // cancelled meanwhile
+      if (tryLocal) logMsg(t("localFallback"));
+      setStepState(1, "p-step active");
+    }
+    if (result) {
+      // local result ready; skip the server
+    } else if (N <= 5) {
       var b = strips.slice();
       while (b.length < 3) b.push(b[b.length - 1]);
       result = await stitchBatch(b);
