@@ -32,13 +32,14 @@ function serve() {
 
 function realCases() {
   const dir = path.join(ROOT, "test-sets"), cases = [], rollouts = {};
+  const lf = path.join(dir, "labels.json"), labels = fs.existsSync(lf) ? JSON.parse(fs.readFileSync(lf, "utf8")) : {};
   for (const set of fs.readdirSync(dir)) {
     for (const sub of ["photos", "rollout"]) {
       const p = path.join(dir, set, sub);
       if (!fs.existsSync(p)) continue;
       for (const f of fs.readdirSync(p).filter((f) => /\.jpe?g$/i.test(f)).sort()) {
         const src = `/test-sets/${set}/${sub}/${f}`;
-        if (sub === "photos") cases.push({ set, file: f, src });
+        if (sub === "photos") cases.push({ set, file: f, src, label: labels[`${set}/photos/${f}`] || null });
         else (rollouts[set] = rollouts[set] || []).push(src);
       }
     }
@@ -58,9 +59,14 @@ function summarize(cases) {
       if (r.ms != null) s.ms.push(r.ms);
     }
   const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  for (const c of cases.filter((c) => c.labelled))
+    for (const r of c.results) {
+      const s = (by["real:" + r.name] = by["real:" + r.name] || { rimTop: [], rimBot: [], ang: [[], [], []], ms: [], sT: [], sB: [] });
+      if (r.rim) { s.rimTop.push(r.rim.top); s.rimBot.push(r.rim.bot); s.sT.push(r.side.top); s.sB.push(r.side.bot); }
+    }
   const out = {};
   for (const [k, s] of Object.entries(by))
-    out[k] = { rimTopPct: mean(s.rimTop), rimBotPct: mean(s.rimBot), angDeg_0_30: mean(s.ang[0]), angDeg_30_60: mean(s.ang[1]), angDeg_60_90: mean(s.ang[2]), ms: mean(s.ms), ellTopPct: s.eT ? mean(s.eT) : null, ellBotPct: s.eB ? mean(s.eB) : null };
+    out[k] = { rimTopPct: mean(s.rimTop), rimBotPct: mean(s.rimBot), angDeg_0_30: mean(s.ang[0]), angDeg_30_60: mean(s.ang[1]), angDeg_60_90: mean(s.ang[2]), ms: mean(s.ms), ellTopPct: s.eT ? mean(s.eT) : null, ellBotPct: s.eB ? mean(s.eB) : null, sideTopPct: s.sT ? mean(s.sT) : null, sideBotPct: s.sB ? mean(s.sB) : null, n: s.rimTop.length };
   return out;
 }
 

@@ -4,7 +4,7 @@
    - silhouette: separate object from background using colours sampled along the image border
    - top ellipse: fitted to the silhouette's top edge (= back half of the top rim)
    - bottom ellipse: fitted to the silhouette's bottom edge (= front half of the bottom rim)
-   - whether the camera is above or below the top rim is decided from perspective geometry
+   - the camera is assumed to be above the top rim (front arc bows down)
    Evaluated against the old red-pixel scan and three variants in eval/ (see ROADMAP.md). */
 "use strict";
 
@@ -246,21 +246,6 @@ var RIM2 = (function () {
 
   function frontY(e, x) { var u = (x - e.xc) / e.a; return e.yc + (e.s || 1) * e.b * Math.sqrt(Math.max(0, 1 - u * u)); }
 
-  /* Is the camera above the top rim (front arc bows down) or below it (bows up)? The silhouette
-     can't tell: in both cases its top edge is an arc of the top ellipse. Use perspective geometry:
-     a rim's openness b/a ~ sin(viewing angle onto that rim). The angle between the two rims is
-     asin(rb) - asin(rt) if the camera is above both, asin(rb) + asin(rt) if it is between them.
-     Together with the rims' vertical separation in the image, each hypothesis implies a lens
-     field of view; pick the one closer to a typical ~40 degrees. */
-  function cameraAboveTop(top, bot, H) {
-    var rt = Math.min(0.99, top.b / top.a), rb = Math.min(0.99, bot.b / bot.a), dy = bot.yc - top.yc;
-    if (top.b < 2 || dy <= 0) return true;
-    if (rt >= rb) return false; // from above, the lower rim is always seen more openly
-    function vfov(dA) { return 2 * Math.atan(H / 2 / (dy / Math.max(1e-3, dA))); }
-    var above = vfov(Math.asin(rb) - Math.asin(rt)), below = vfov(Math.asin(rb) + Math.asin(rt)), ref = 0.7;
-    return Math.abs(Math.log(above / ref)) < Math.abs(Math.log(below / ref));
-  }
-
   // Ellipse (in full-res px) -> app's 3-handle rim format (front half). The outer control points
   // are chosen by search so the app's curve (evalRimCurve) follows the ellipse as closely as possible.
   function toHandles(e) {
@@ -292,7 +277,9 @@ var RIM2 = (function () {
     if (opts.twoClass !== false) mask = refineMask(S, mask); // default on; {twoClass:false} = plain A
     var f = fitFromMask(mask, S.W, S.H), top = f.top, bot = f.bot;
     if (!top || !bot) return null;
-    top.s = cameraAboveTop(top, bot, S.H) ? 1 : -1;
+    // Front arc of the top rim bows down (camera above the rim), as in museum/product photos.
+    // A perspective-based above/below guess was tried and lost on hand-labelled photos (3.9% vs 1.1%).
+    top.s = opts.topDir || 1;
     return toB(scaleE(top, S.sc), scaleE(bot, S.sc), f.yMin / S.sc, f.yMax / S.sc);
   }
 
