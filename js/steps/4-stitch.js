@@ -160,7 +160,9 @@ function setStepState(idx, state) {
    overlapping detail, and blend on the cylinder (js/core/camera.js, js/core/registration.js).
    Returns a canvas, or null when the photos can't be lined up reliably (caller falls back to the
    server). Uses each photo's crop from the Adjust step and the feather setting. */
-var STITCH_MIN_NCC = -1; // quality-gate threshold on the worst overlap agreement (calibrated below)
+// Quality gate on the worst substantial overlap agreement. Calibrated on 8 real sets: clean results
+// scored 0.22-0.45, ghosted ones 0.00-0.09 (one clean set, LACMA 168550, scored 0.04 and falls back).
+var STITCH_MIN_NCC = 0.2;
 function localStitch() {
   // Experimental: off by default until real-photo registration is reliable. Enable with ?local=1.
   if (!/[?&]local=1\b/.test(location.search)) return null;
