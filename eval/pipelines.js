@@ -19,8 +19,9 @@ var PIPELINES = {
   },
   // Silhouette + ellipse fit, without the two-class mask refinement
   "A silhouette": function (cv) { return RIM2.detect(cv, { twoClass: false }); },
-  // Current app default: A + two-class (vessel colours vs background/shadow) mask refinement
+  // Current app default: two-class mask + top rim refinement.
   "A2 two-class": function (cv) { return RIM2.detect(cv); },
+  "A2 original fit": function (cv) { return RIM2.detect(cv, { refineRims: false }); },
   // A2 + Snap
   "A+snap": function (cv) {
     var b = RIM2.detect(cv), im = { cv: cv, b: b };

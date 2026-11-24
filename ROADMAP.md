@@ -39,14 +39,69 @@ On real photos the red-pixel rim scan often fails outright (e.g. the Met set, wh
 
 ## Phase 2: automatic rim recognition
 
-### Real-photo scores (hand labels, `test-sets/labels.json`, 21 scored photos in 9 sets)
+### Earlier real-photo scores (hand labels, `test-sets/labels.json`, 21 scored photos in 9 sets)
 
 | detector | top rim %H | bottom rim %H | rim ends, top % | rim ends, bottom % |
 |---|---|---|---|---|
 | original | 4.6 | 5.6 | 25 | 30 |
-| A2 + "camera above" (current) | **1.1** | **1.2** | **2.3** | **1.6** |
+| A2 + "camera above" (original fit) | **1.1** | **1.2** | **2.3** | **1.6** |
 
 The perspective-based camera above/below guess was removed: on real photos it scored 3.9% top vs 1.1% for always assuming "above". Label more photos at `eval/label.html` (Met sets need their photos saved by hand to be scored).
+
+### Top-rim refinement on labelled photos
+
+The default now recovers clipped ends on nearly flat top rims from the median of several mask rows just below the lip. It then checks for a coherent front edge at the original photo resolution. The edge search stays below the ellipse centre and close to the mask fit. It blends an accepted fit halfway with the silhouette estimate to limit shifts toward painted bands.
+
+Playwright Chromium results on 11 labelled photos from five LACMA and pca4sale sets and nine synthetic scenes. The Met image server returned blocking pages for all 18 labelled Met photos, including the 10 from `met-310364`. The synthetic harness used its procedural texture fallback because the Met rollout image was also unavailable.
+
+| detector | real top %H | real bottom %H | real top ends %W | real bottom ends %W | synthetic top %H | synthetic bottom %H |
+|---|---:|---:|---:|---:|---:|---:|
+| A2 original fit | 0.84 | 1.54 | 1.46 | 1.66 | 3.23 | 5.51 |
+| **A2 two-class (new default)** | **0.67** | **1.54** | **0.98** | **1.66** | **3.22** | **5.51** |
+
+Run `node scripts/eval.js --only "A2 original fit,A2 two-class"` to reproduce the comparison. The evaluator gives each pipeline a fresh canvas so Chrome's pixel-read heuristics cannot change the coarse resize between variants. Chrome and Playwright's bundled Chromium produced slightly different baseline masks on this machine. The exploratory scores below use the same installed Chrome build throughout.
+
+| trial | real top %H | real bottom %H | real top ends %W | real bottom ends %W | synthetic top %H | synthetic bottom %H | finding |
+|---|---:|---:|---:|---:|---:|---:|---|
+| A2 original fit | 0.92 | 1.52 | 1.71 | 1.59 | 3.27 | 6.08 | Comparison baseline |
+| 1. Extrapolate ends from strong side gradients | 0.93 | 1.52 | 2.02 | 1.80 | 3.26 | 6.07 | Outer wall edges often fell outside the labelled ends |
+| 2. Refit the two outer arcs to nearby gradients | 0.68 | 1.58 | 1.71 | 1.59 | 3.36 | 6.00 | Top improved, bottom worsened on real photos |
+| 3. Blend a local fit to the top front edge | 0.68 | 1.52 | 1.71 | 1.59 | 3.37 | 6.08 | Improved the top curve with the existing width |
+| 4. Recover flat-rim ends from nearby mask rows | 0.92 | 1.52 | 1.01 | 1.59 | 3.27 | 6.08 | Recovered the clipped pca4sale ends |
+| 5. Search for a bottom edge leading into backdrop colour | 0.92 | 1.52 | 1.71 | 1.59 | 3.27 | 6.08 | No candidate met the contrast and support requirements |
+| 6. Combine flat-rim width recovery and front-edge fitting | 0.75 | 1.52 | 1.01 | 1.59 | 3.37 | 6.08 | Kept with the below-centre guard, which resolved a back-edge match in synthetic `far-flat` |
+| 7. Estimate bottom width from lower shoulder rows | 0.92 | 1.52 | 1.71 | 1.68 | 3.27 | 6.09 | Bottom end error increased |
+| 8. Search for a dark transition across the foot | 0.92 | 1.38 | 1.71 | 1.59 | 3.27 | 6.46 | Helped two pca4sale views but worsened another and followed a painted band in `mid-dark` (0.28 → 3.72%H) |
+
+Remaining outliers in the final Chromium run:
+
+- **Bottom curve:** `pca4sale-446/02.jpg` (3.81%H), `04.jpg` (3.02%H) and `01.jpg` (2.61%H). The dark base grades into the acrylic stand and shadow. The silhouette fit follows a lower edge than the hand label.
+- **Top curve:** `pca4sale-446/01.jpg` (1.89%H) has a nearly edge-on lip, and its labelled front middle sits above the endpoint average. `lacma-168468/01.jpg` (1.38%H) has a broad lip, with the labelled curve along its inner edge.
+- **Ends:** `lacma-168693/01.jpg` (top 2.15%W) has a wider outer lip than the labelled opening. The rounded bases of `lacma-168693/02.jpg` (bottom 3.68%W) and `lacma-168596/02.jpg` and `03.jpg` (3.36 and 3.22%W) leave the fitted ends higher and wider than the labelled ends.
+
+### Additional hand labels
+
+The supplied label export adds 13 photos and replaces the existing coordinates with the full-precision export, for 42 labelled photos total. Six additional LACMA photos were fetched, giving 17 available labelled photos across eight sets. All 25 labelled Met photos remain unavailable, including the seven newly labelled originals whose public image URLs returned blocking pages.
+
+The same comparison on the expanded labels, using Playwright Chromium and the procedural synthetic texture fallback:
+
+| detector | real top %H | real bottom %H | real top ends %W | real bottom ends %W | synthetic top %H | synthetic bottom %H |
+|---|---:|---:|---:|---:|---:|---:|
+| A2 original fit | 0.90 | 1.22 | 1.60 | 1.91 | 3.23 | 5.51 |
+| A2 two-class (new default) | 0.70 | 1.22 | 0.93 | 1.91 | 3.22 | 5.51 |
+
+The expanded set exposes two larger outliers: `lacma-168977/03.jpg` has 2.34%H top error and `lacma-168399/03.jpg` has 9.74%W bottom endpoint error. The largest bottom curve error remains `pca4sale-446/02.jpg` at 3.81%H.
+
+### Second additional label export
+
+Ten further LACMA labels bring the total to 52, with all existing coordinates preserved. All ten photos downloaded, giving 27 available labelled photos across 12 sets. The 25 labelled Met photos remain unavailable.
+
+| detector | real top %H | real bottom %H | real top ends %W | real bottom ends %W | synthetic top %H | synthetic bottom %H |
+|---|---:|---:|---:|---:|---:|---:|
+| A2 original fit | 1.13 | 1.42 | 1.79 | 1.87 | 3.23 | 5.51 |
+| A2 two-class (new default) | 0.92 | 1.42 | 1.12 | 1.87 | 3.22 | 5.51 |
+
+Measured with the same Playwright Chromium comparison and procedural synthetic texture fallback. All pipelines completed successfully.
 
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
@@ -57,7 +112,7 @@ Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real
 | original (red-pixel scan) | 8.5 | 6.4 | fails outright on many real photos |
 | original + Snap | 7.3 | 5.2 | |
 | **A: silhouette (local border-colour model) + ellipse fit** | **1.5** | 8.0* | **winner, shipped** |
-| **A2: A + two-class mask (vessel colours vs background-or-shadow)** | **1.5** | **4.8** | **current default** |
+| **A2: A + two-class mask (vessel colours vs background-or-shadow)** | **1.5** | **4.8** | **mask still used by default** |
 | A + Snap | 3.7 | 8.6 | Snap now makes rims *worse* |
 | C: A + edge search over ellipse params | 6.0 | 6.7 | locks onto painted bands |
 | D: bottom from where side edges end | 1.5 | 10.0 | fooled by floor horizon lines |

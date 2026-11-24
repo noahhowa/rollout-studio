@@ -2,7 +2,7 @@
    A circle seen through a camera is an ellipse, so each rim is modelled as an axis-aligned
    ellipse {xc, yc, a, b}. The rim we want is its front (lower) half: y = yc + b*sqrt(1-u^2).
    - silhouette: separate object from background using colours sampled along the image border
-   - top ellipse: fitted to the silhouette's top edge (= back half of the top rim)
+   - top ellipse: seeded from the silhouette's back arc, then checked against the visible front lip
    - bottom ellipse: fitted to the silhouette's bottom edge (= front half of the bottom rim)
    - the camera is assumed to be above the top rim (front arc bows down)
    Evaluated against the old red-pixel scan and three variants in eval/ (see ROADMAP.md). */
@@ -271,6 +271,75 @@ var RIM2 = (function () {
       topH: toHandles(top), botH: toHandles(bot), topE: top, botE: bot };
   }
 
+  function recoverFlatRimWidth(e, mask, W, height) {
+    if (e.b >= 0.07 * e.a) return;
+    // A nearly flat rim can cross a row where the mask clips a pale or thin lip.
+    // Use several rows just inside the body to recover the ends, with a bounded expansion.
+    var left = [], right = [];
+    for (var i = 0; i < 7; i++) {
+      var span = rowSpan(mask, W, Math.round(e.yc + height * (0.012 + 0.004 * i)));
+      if (span) { left.push(span.l); right.push(span.r); }
+    }
+    if (left.length < 5) return;
+    var xl = Math.max(e.xc - 1.2 * e.a, Math.min(e.xc - e.a, median(left)));
+    var xr = Math.min(e.xc + 1.2 * e.a, Math.max(e.xc + e.a, median(right)));
+    e.xc = (xl + xr) / 2;
+    e.a = (xr - xl) / 2;
+  }
+
+  // Find a nearby vertical colour transition at one column of the original image.
+  function edgeY(im, x, y, reach, blur) {
+    x = Math.floor(x);
+    if (x < 0 || x >= im.width) return null;
+    var lo = Math.max(blur, Math.ceil(y - reach - 0.5));
+    var hi = Math.min(im.height - blur - 1, Math.floor(y + reach - 0.5));
+    var stride = 4 * im.width, d = im.data, pos = -1, strength = 0, best = 0;
+    function contrast(p) {
+      var i = (p - blur) * stride + 4 * x, j = i + 2 * blur * stride;
+      return Math.hypot(d[i] - d[j], d[i + 1] - d[j + 1], d[i + 2] - d[j + 2]);
+    }
+    for (var p = lo; p <= hi; p++) {
+      var c = contrast(p), score = c / (1 + Math.abs(p + 0.5 - y) / reach);
+      if (score > best) { best = score; pos = p; strength = c; }
+    }
+    if (strength < 12) return null;
+    // Interpolate the gradient peak between pixel centres.
+    var delta = 0;
+    if (pos > lo && pos < hi) {
+      var l = contrast(pos - 1), r = contrast(pos + 1), curvature = l + r - 2 * strength;
+      if (curvature < 0) delta = Math.max(-0.5, Math.min(0.5, (l - r) / (2 * curvature)));
+    }
+    return pos + 0.5 + delta;
+  }
+
+  function refineFrontRim(cv, e, height) {
+    if (e.a < 5) return;
+    var blur = Math.max(1, Math.round(cv.width / WORK));
+    var reach = Math.max(3 * blur, 0.028 * height), pad = reach + blur + 1;
+    // The sampled middle 80% reaches from yc + 0.6*b to yc + b.
+    // Keep edge centres below yc so a shallow rim cannot snap to its exposed back edge.
+    var y0 = Math.max(0, Math.ceil(e.yc) - blur, Math.floor(e.yc + 0.6 * e.b - pad));
+    var y1 = Math.min(cv.height, Math.ceil(e.yc + e.b + pad));
+    if (y1 <= y0) return;
+    var im = cv.getContext("2d").getImageData(0, y0, cv.width, y1 - y0), xs = [], ys = [];
+    for (var i = -12; i <= 12; i++) {
+      var x = e.xc + e.a * i / 15;
+      var edge = edgeY(im, x, frontY(e, x) - y0, reach, blur);
+      if (edge !== null) { xs.push(Math.floor(x) + 0.5); ys.push(edge + y0); }
+    }
+    if (xs.length < 18) return;
+    var fit = fitArc(xs, ys, e.xc, e.a, 1);
+    var residuals = xs.map(function (x, i) {
+      var u = (x - e.xc) / e.a;
+      return Math.abs(ys[i] - fit.yc - fit.b * Math.sqrt(Math.max(0, 1 - u * u)));
+    });
+    if (median(residuals) > Math.max(1.5 * blur, 0.004 * height)) return;
+    if (Math.abs(fit.yc - e.yc) > reach || Math.abs(fit.b - e.b) > reach) return;
+    // Keep the silhouette as an anchor: painted lines can run parallel to the lip.
+    e.yc = (e.yc + fit.yc) / 2;
+    e.b = (e.b + fit.b) / 2;
+  }
+
   function detect(cv, opts) {
     opts = opts || {};
     var S = small(cv), mask = silhouette(S);
@@ -280,7 +349,12 @@ var RIM2 = (function () {
     // Front arc of the top rim bows down (camera above the rim), as in museum/product photos.
     // A perspective-based above/below guess was tried and lost on hand-labelled photos (3.9% vs 1.1%).
     top.s = opts.topDir || 1;
-    return toB(scaleE(top, S.sc), scaleE(bot, S.sc), f.yMin / S.sc, f.yMax / S.sc);
+    var refine = opts.twoClass !== false && opts.refineRims !== false;
+    var height = f.yMax - f.yMin;
+    if (refine) recoverFlatRimWidth(top, mask, S.W, height);
+    top = scaleE(top, S.sc);
+    if (refine && top.s === 1) refineFrontRim(cv, top, height / S.sc);
+    return toB(top, scaleE(bot, S.sc), f.yMin / S.sc, f.yMax / S.sc);
   }
 
   return { detect: detect, toHandles: toHandles, fitArc: fitArc, _silhouette: function (cv) { var S = small(cv); return { mask: silhouette(S), W: S.W, H: S.H }; } };

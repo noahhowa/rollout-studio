@@ -70,7 +70,7 @@ function angularError(strip, tex, rot) {
   return errs.map(function (a) { return a.length ? med(a) : null; });
 }
 var COLORS = { truth: "#16a34a", baseline: "#f97316", "baseline+snap": "#2563eb", oracle: "#16a34a",
-  "A silhouette": "#db2777", "A+snap": "#7c3aed", "A2 two-class": "#ca8a04", "C silh+edges": "#0891b2", "D silh+sides": "#ca8a04", "E silh+sym": "#dc2626" };
+  "A silhouette": "#db2777", "A+snap": "#7c3aed", "A2 two-class": "#ca8a04", "A2 original fit": "#a855f7", "C silh+edges": "#0891b2", "D silh+sides": "#ca8a04", "E silh+sym": "#dc2626" };
 var PALETTE = ["#f97316", "#2563eb", "#db2777", "#7c3aed", "#0891b2"];
 function colorFor(name, i) { return COLORS[name] || PALETTE[i % PALETTE.length]; }
 function toJpeg(cv, w) {
@@ -111,10 +111,13 @@ function runPipelines(cv, truth, extra) {
   Object.keys(PIPELINES).filter(function (n) { return !ONLY || ONLY.indexOf(n) >= 0; }).forEach(function (name) {
     var r = { name: name };
     try {
-      var t0 = performance.now(); r.b = PIPELINES[name](cv); r.ms = Math.round(performance.now() - t0);
-      r.strip = toJpeg(unwarp(cv, r.b), 500);
+      // Give each detector a fresh canvas: repeated pixel reads can change how Chrome scales it.
+      var input = document.createElement("canvas"); input.width = cv.width; input.height = cv.height;
+      input.getContext("2d").drawImage(cv, 0, 0);
+      var t0 = performance.now(); r.b = PIPELINES[name](input); r.ms = Math.round(performance.now() - t0);
+      r.strip = toJpeg(unwarp(input, r.b), 500);
       if (truth) {
-        r.rim = rimError(r.b, truth); r.ang = angularError(unwarp(cv, r.b), extra.tex, extra.rot);
+        r.rim = rimError(r.b, truth); r.ang = angularError(unwarp(input, r.b), extra.tex, extra.rot);
         if (r.b.topE) r.rimEllipse = rimError({ topH: ellH(r.b.topE), botH: ellH(r.b.botE) }, truth, true);
       }
     } catch (e) { r.error = String(e); }
