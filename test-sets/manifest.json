@@ -282,6 +282,64 @@
         "https://collections-images.lacma.org/images/140750/140750-3-desktop.jpg",
         "https://collections-images.lacma.org/images/140750/140750-4-desktop.jpg"
       ]
+    },
+    {
+      "id": "edge-sothebys-2023-bird-vessel",
+      "source": "sothebys",
+      "url": "https://www.sothebys.com/en/buy/auction/2023/art-dafrique-doceanie-dindonesie-et-des-ameriques/grand-vase-cylindrique-maya-classique-recent-600",
+      "title": "Tall Maya bird vessel, dark gradient and contact shadow",
+      "images": [
+        "https://sothebys-md.brightspotcdn.com/dims4/default/4d648f9/2147483647/strip/true/crop/1656x2000+0+0/resize/2048x2473!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Fwebnative%2Fimages%2F13%2Fe1%2F97725f9b45908d29cf4b9b6a43b2%2Fpf2318-cv7kp-t2-06.jpg",
+        "https://sothebys-md.brightspotcdn.com/dims4/default/dc256e0/2147483647/strip/true/crop/1656x2000+0+0/resize/2048x2473!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Fwebnative%2Fimages%2Fef%2F02%2F7756639744eb97d6ab7f0692bce0%2Fpf2318-cv7kp-t2-09.jpg"
+      ],
+      "note": "Independent rim-labelling edge-case subset. Pale painted areas against a pale gray backdrop, dark rim bands, and a long one-sided contact shadow.",
+      "original_set": "sothebys-2023-grand-vase-cylindrique-600"
+    },
+    {
+      "id": "edge-sothebys-2024-polychrome",
+      "source": "sothebys",
+      "url": "https://www.sothebys.com/en/buy/auction/2024/arts-dafrique-doceanie-et-des-ameriques/vase-maya",
+      "title": "Maya polychrome vessel, gray gradient and soft shadow",
+      "images": [
+        "https://sothebys-md.brightspotcdn.com/dims4/default/8de8d6a/2147483647/strip/true/crop/1999x2000+0+0/resize/2048x2049!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Fwebnative%2Fimages%2Fe7%2F0c%2F686c233b46c6a8f204261978e9a0%2Fpf2408-cxhdy-t2-01.jpg",
+        "https://sothebys-md.brightspotcdn.com/dims4/default/e78b4ba/2147483647/strip/true/crop/1911x2000+0+0/resize/2048x2143!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Fwebnative%2Fimages%2F82%2Fb2%2Fe98c871f48b797da882860cd2f22%2Fpf2408-cxhdy-t2-02.jpg"
+      ],
+      "note": "Independent rim-labelling edge-case subset. Very shallow opening, dark patterned base, and gray backdrop/floor gradient with contact shadow.",
+      "original_set": "sothebys-2024-vase-maya"
+    },
+    {
+      "id": "edge-sothebys-2026-stone-floor",
+      "source": "sothebys",
+      "url": "https://www.sothebys.com/en/buy/auction/2026/africa-oceania-americas/maya-tall-polychrome-vessel",
+      "title": "Tall Maya polychrome vessel on textured stone",
+      "images": [
+        "https://sothebys-md.brightspotcdn.com/dims4/default/f6cbb2e/2147483647/strip/false/crop/4800x4800+0+0/resize/2048x2048!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Fd0%2F86%2F02f5cb544eebb3744b50fb7c9a79%2Fn12226-cnfwb-t2-01pl300.png",
+        "https://sothebys-md.brightspotcdn.com/dims4/default/c0902ef/2147483647/strip/false/crop/4800x4800+0+0/resize/2048x2048!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2F1e%2F40%2Fbd30b8f84a55a6b8b382baec96d7%2Fn12226-cnfwb-t2-02pl300.png",
+        "https://sothebys-md.brightspotcdn.com/dims4/default/144503b/2147483647/strip/false/crop/4800x4800+0+0/resize/2048x2048!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Ffe%2F07%2F4e712c8542ccb5550c2a7629cc5f%2Fn12226-cnfwb-t2-03pl300.png",
+        "https://sothebys-md.brightspotcdn.com/dims4/default/9e1f474/2147483647/strip/false/crop/4800x4800+0+0/resize/2048x2048!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2F37%2Fc1%2F160427be44f881a01d612f89621c%2Fn12226-cnfwb-t2-04pl300.png"
+      ],
+      "note": "Independent rim-labelling edge-case subset. Textured gray floor and backdrop, low-contrast brown base, dark contact shadow, and multiple painted sides.",
+      "original_set": "sothebys-2026-maya-tall-polychrome-vessel"
+    },
+    {
+      "id": "edge-christies-4916369",
+      "source": "christies",
+      "url": "https://www.christies.com/en/lot/lot-4916369",
+      "title": "Mayan polychrome vessel, dark gradient backdrop",
+      "images": [
+        "https://www.christies.com/img/LotImages/2007/NYR/2007_NYR_01837_0105_000%28020743%29.jpg?w=1600"
+      ],
+      "note": "Independent rim-labelling edge-case subset. Near-black upper background fading to gray floor; softly shadowed rounded base. The published original is 512 by 431 pixels."
+    },
+    {
+      "id": "edge-sothebys-2016-124",
+      "source": "sothebys",
+      "url": "https://www.sothebys.com/en/auctions/ecatalogue/2016/african-oceanic-pre-columbian-art-n09502/lot.124.html",
+      "title": "Maya polychrome cylinder K1186, soft contact shadow",
+      "images": [
+        "https://sothebys-brightspot-migration.s3.amazonaws.com/5f/37/49/e28407101cd22f866a9ac5467db5766500a4d2c53a390e18de72168037/315n09502-8yv38.jpg"
+      ],
+      "note": "Independent rim-labelling edge-case subset. Almost edge-on top opening and a rounded brown base merging into a soft contact shadow on a white floor."
     }
   ]
 }

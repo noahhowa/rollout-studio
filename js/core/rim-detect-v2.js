@@ -366,6 +366,38 @@ var RIM2 = (function () {
     e.b = (e.b + fit.b) / 2;
   }
 
+  // A painted band can leave a shallow initial base that a later floor-leak guard preserves.
+  // Recover its curvature from the outer side columns, excluding central contact shadows.
+  function recoverBaseCurve(mask, W, H, e, yMin, yMax) {
+    if (e.b > 0.06 * e.a) return e;
+    var height = yMax - yMin, spans = [];
+    for (var i = 0; i < 9; i++) {
+      var row = rowSpan(mask, W, Math.round(yMin + height * (0.45 + 0.025 * i)));
+      if (row) spans.push(row);
+    }
+    if (spans.length < 7) return e;
+    var xc = median(spans.map(function (s) { return (s.l + s.r) / 2; }));
+    var a = median(spans.map(function (s) { return (s.r - s.l) / 2; }));
+    if (a < 0.75 * e.a || a > 1.8 * e.a) return e;
+    // Retain stable rim ends. Use the body span only when the shallow fit collapsed inward.
+    if (e.a >= 0.8 * a && e.a <= 1.25 * a) { xc = e.xc; a = e.a; }
+    var xs = [], ys = [];
+    for (var x = Math.ceil(xc - 0.95 * a); x <= xc + 0.95 * a; x++) {
+      if (Math.abs(x - xc) < 0.68 * a || x < 0 || x >= W) continue;
+      for (var y = H - 1; y >= yMin + height * 0.6; y--) {
+        if (!mask[y * W + x]) continue;
+        xs.push(x); ys.push(y); break;
+      }
+    }
+    var leftCount = xs.filter(function (x) { return x < xc; }).length;
+    if (leftCount < 6 || xs.length - leftCount < 6) return e;
+    var fit = fitArc(xs, ys, xc, a, 1), residual = median(xs.map(function (x, i) {
+      var u = (x - xc) / a; return Math.abs(ys[i] - fit.yc - fit.b * Math.sqrt(1 - u * u));
+    }));
+    if (fit.b < 2 || fit.b > 0.65 * a || residual > 2 || Math.abs(fit.yc + fit.b - yMax) > 0.3 * height) return e;
+    return { xc: xc, a: a, yc: fit.yc, b: fit.b };
+  }
+
   function detect(cv, opts) {
     opts = opts || {};
     var S = small(cv), mask = silhouette(S), initial = fitFromMask(mask, S.W, S.H);
@@ -382,6 +414,12 @@ var RIM2 = (function () {
       bot = initial.bot; f.yMax = initial.yMax;
     }
     if (!top || !bot) return null;
+    var bottomLimit = f.yMax;
+    if (fixBase && opts.recoverBaseCurve !== false) {
+      var recovered = recoverBaseCurve(mask, S.W, S.H, bot, f.yMin, f.yMax);
+      if (recovered !== bot) bottomLimit = Math.min(S.H - 1, recovered.yc + recovered.b);
+      bot = recovered;
+    }
     // Front arc of the top rim bows down (camera above the rim), as in museum/product photos.
     // A perspective-based above/below guess was tried and lost on hand-labelled photos (3.9% vs 1.1%).
     top.s = opts.topDir || 1;
@@ -390,7 +428,7 @@ var RIM2 = (function () {
     if (refine) recoverFlatRimWidth(top, mask, S.W, height);
     top = scaleE(top, S.sc);
     if (refine && top.s === 1) refineFrontRim(cv, top, height / S.sc);
-    return toB(top, scaleE(bot, S.sc), f.yMin / S.sc, f.yMax / S.sc);
+    return toB(top, scaleE(bot, S.sc), f.yMin / S.sc, bottomLimit / S.sc);
   }
 
   return { detect: detect, toHandles: toHandles, fitArc: fitArc, _silhouette: function (cv) { var S = small(cv); return { mask: silhouette(S), W: S.W, H: S.H }; } };

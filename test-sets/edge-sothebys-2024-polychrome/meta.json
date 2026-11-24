@@ -1,0 +1,27 @@
+{
+  "id": "edge-sothebys-2024-polychrome",
+  "source_url": "https://www.sothebys.com/en/buy/auction/2024/arts-dafrique-doceanie-et-des-ameriques/vase-maya",
+  "title": "Maya polychrome vessel, gray gradient and soft shadow",
+  "edge_case": "Very shallow opening, dark patterned base, and gray backdrop/floor gradient with contact shadow.",
+  "images": [
+    {
+      "file": "photos/01.jpg",
+      "size": [
+        2048,
+        2049
+      ],
+      "url": "https://sothebys-md.brightspotcdn.com/dims4/default/8de8d6a/2147483647/strip/true/crop/1999x2000+0+0/resize/2048x2049!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Fwebnative%2Fimages%2Fe7%2F0c%2F686c233b46c6a8f204261978e9a0%2Fpf2408-cxhdy-t2-01.jpg",
+      "original_file": "photos/01.jpg"
+    },
+    {
+      "file": "photos/02.jpg",
+      "size": [
+        2048,
+        2143
+      ],
+      "url": "https://sothebys-md.brightspotcdn.com/dims4/default/e78b4ba/2147483647/strip/true/crop/1911x2000+0+0/resize/2048x2143!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Fwebnative%2Fimages%2F82%2Fb2%2Fe98c871f48b797da882860cd2f22%2Fpf2408-cxhdy-t2-02.jpg",
+      "original_file": "photos/03.jpg"
+    }
+  ],
+  "original_set": "sothebys-2024-vase-maya"
+}

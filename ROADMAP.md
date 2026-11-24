@@ -144,6 +144,43 @@ The six regression cases average 13.61 → 0.42%H bottom error. The 27 previousl
 
 Reproduce with `node scripts/eval.js --only "A2 before base fix,A2 two-class"`. Run `node scripts/check_bottom_rims.js` for assertions on both supplied photos at all three sizes and three repeated canvas reads, plus the normal Upload → Map Rims path. Each base curve and front midpoint must be within 2% of vessel height, and endpoint x error must be under 5% of rim width. The report is `eval/out/report.html`, and the upload preview is `eval/out/bottom-rim-fix.png`.
 
+### Shallow-base recovery and independent edge-case labels
+
+Eleven new hand labels from `lacma-168499` and `lacma-168564` bring the label file to 65 entries. This run has 40 available source photos and 44 scored cases, including the supplied PNGs at three sizes. The 25 Met photos remain unavailable. Scores below use Playwright Chromium and the procedural synthetic texture fallback. The expanded sample exposes harder failures, so its baseline should be compared within this table.
+
+| detector | real top %H | real bottom %H | real top ends %W | real bottom ends %W | synthetic top %H | synthetic bottom %H |
+|---|---:|---:|---:|---:|---:|---:|
+| A2 before curve recovery | 1.404 | 2.148 | 1.707 | 2.602 | 3.225 | 5.511 |
+| **A2 two-class** | **1.404** | **1.881** | **1.707** | **2.602** | **3.225** | **5.511** |
+
+The kept change reduces mean bottom error by 12.4%. On `lacma-168564/04.jpg`, a painted band produces a shallow base that the existing floor-leak guard preserves. The detector now fits the outer side portions of the lower mask boundary when the base is nearly flat. It requires support on both sides, a small residual, and plausible width, curvature and displacement. Central contact shadows are excluded, and stable rim ends are retained. This photo improves from 12.610 to 0.867%H bottom error with unchanged 0.761%W endpoint error. The other 43 cases and all nine synthetic scenes retain their scores.
+
+Experiments were removed unless kept above. Early trials used the 33 cases available before the independent labels arrived.
+
+| experiment family | comparison | outcome |
+|---|---|---|
+| Paired front/back opening contrast, including dark interiors | 33-case top 0.954 → 2.370; half blend 1.390 | Painted bands attracted the fit. A guarded combination reached 0.849 but synthetic top worsened 3.225 → 4.031. Removed. |
+| Initial or union mask for top fitting | 33-case top 0.954 → 1.335 or 0.904 | Union gain did not generalize to the new vessels, giving only 1.404 → 1.400 on all 44 cases. Removed. |
+| Body-axis bottom correction | 33-case bottom 1.235 → 1.628, ends 1.871 → 2.410 | Worsened curvature and ends. Removed. |
+| Tighter floor-growth guard | 33-case bottom 1.235 → 1.222, ends 1.871 → 2.004 | Synthetic bottom also worsened 5.511 → 5.960. Removed. |
+| Calibrated bottom proposal with gradient acceptance | 44-case bottom 2.148 → 2.077 | Small gain required learned coefficients from earlier photos. Removed in favor of the simpler geometric recovery. |
+| Wider refinement search below the silhouette | 44-case top 1.404 → 2.320, bottom 2.148 → 2.205 | Larger search found distracting edges. Removed. |
+| Shallow-base recovery variants | 44-case bottom 2.148 → 1.876 with relaxed rounded guard | Bottom ends worsened 2.602 → 2.739. Kept the side-supported fit instead, at 1.881 with unchanged ends. |
+| Stronger shadow rejection only below the initial mask | 44-case bottom 1.881 → 1.885 or 1.884 | No further gain. Removed. |
+
+Reproduce with `node scripts/eval.js --only "A2 before curve recovery,A2 two-class"`. After fetching `lacma-168564`, run `node scripts/check_bottom_rims.js --include-real`. The recovered photo passes at 75%, 100% and 150% size, with three repeated canvas reads. Bottom errors are 0.438, 0.867 and 0.670%H, respectively. The original PNG regression and normal Upload → Map Rims checks also pass. Comparing detections on all 72 synthetic photos in the whole-rollout yardstick found no changed inputs; a new full camera/registration benchmark was therefore not run.
+
+Worst remaining photos in this run:
+
+- `lacma-168564/05.jpg` has 23.197%H bottom error and 17.255%W bottom endpoint error. Its dark base merges into the floor and contact shadow.
+- `lacma-168564/02.jpg` has 13.112%H bottom error and 13.187%W bottom endpoint error. Painted bands and the dark background leave an incorrect base component.
+- `lacma-168564/03.jpg` has 16.236%W bottom endpoint error and 10.730%W top endpoint error. The mask loses low-contrast side regions.
+- `lacma-168564/04.jpg` still has 5.777%H top error. Its dark lip/interior and painted edges make the opening ambiguous. `lacma-168550/02.jpg` has 4.950%H top error.
+
+A background photo search prepared ten unlabelled photos across five additional vessels. The `edge-*` sets in the manifest include official source URLs, local dimensions, and original set/file provenance where available. They cover dark gradients, textured stone floors, pale vessel/background transitions and contact shadows. The smallest Christie’s image is only 512 × 431, so annotation precision is limited. Download with `python3 scripts/fetch_test_sets.py edge-sothebys-2023-bird-vessel edge-sothebys-2024-polychrome edge-sothebys-2026-stone-floor edge-christies-4916369 edge-sothebys-2016-124`.
+
+The labeller now prefers downloaded photos, seeds committed labels while preserving browser-saved edits, accepts `?sets=id,id&unlabelled=1`, and supports Sotheby's and Christie's sources. The ten-photo queue uses those five `edge-*` IDs. Its images and persistence were checked in isolated Playwright Chromium. These photos have not influenced detector tuning or the reported scores.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):

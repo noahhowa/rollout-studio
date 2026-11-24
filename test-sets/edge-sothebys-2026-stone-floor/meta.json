@@ -1,0 +1,45 @@
+{
+  "id": "edge-sothebys-2026-stone-floor",
+  "source_url": "https://www.sothebys.com/en/buy/auction/2026/africa-oceania-americas/maya-tall-polychrome-vessel",
+  "title": "Tall Maya polychrome vessel on textured stone",
+  "edge_case": "Textured gray floor and backdrop, low-contrast brown base, dark contact shadow, and multiple painted sides.",
+  "images": [
+    {
+      "file": "photos/01.jpg",
+      "size": [
+        2048,
+        2048
+      ],
+      "url": "https://sothebys-md.brightspotcdn.com/dims4/default/f6cbb2e/2147483647/strip/false/crop/4800x4800+0+0/resize/2048x2048!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Fd0%2F86%2F02f5cb544eebb3744b50fb7c9a79%2Fn12226-cnfwb-t2-01pl300.png",
+      "original_file": "photos/01.jpg"
+    },
+    {
+      "file": "photos/02.jpg",
+      "size": [
+        2048,
+        2048
+      ],
+      "url": "https://sothebys-md.brightspotcdn.com/dims4/default/c0902ef/2147483647/strip/false/crop/4800x4800+0+0/resize/2048x2048!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2F1e%2F40%2Fbd30b8f84a55a6b8b382baec96d7%2Fn12226-cnfwb-t2-02pl300.png",
+      "original_file": "photos/02.jpg"
+    },
+    {
+      "file": "photos/03.jpg",
+      "size": [
+        2048,
+        2048
+      ],
+      "url": "https://sothebys-md.brightspotcdn.com/dims4/default/144503b/2147483647/strip/false/crop/4800x4800+0+0/resize/2048x2048!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2Ffe%2F07%2F4e712c8542ccb5550c2a7629cc5f%2Fn12226-cnfwb-t2-03pl300.png",
+      "original_file": "photos/03.jpg"
+    },
+    {
+      "file": "photos/04.jpg",
+      "size": [
+        2048,
+        2048
+      ],
+      "url": "https://sothebys-md.brightspotcdn.com/dims4/default/9e1f474/2147483647/strip/false/crop/4800x4800+0+0/resize/2048x2048!/quality/90/?url=http%3A%2F%2Fsothebys-brightspot.s3.amazonaws.com%2Fmedia-desk%2F37%2Fc1%2F160427be44f881a01d612f89621c%2Fn12226-cnfwb-t2-04pl300.png",
+      "original_file": "photos/04.jpg"
+    }
+  ],
+  "original_set": "sothebys-2026-maya-tall-polychrome-vessel"
+}

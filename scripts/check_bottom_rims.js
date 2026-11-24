@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-/* Regression checks for the two supplied dark-backdrop photos. Needs Playwright + Chromium. */
+/* Regression checks for dark-backdrop photos. Needs Playwright + Chromium.
+   Add --include-real after fetching lacma-168564 to check the shallow-band regression too. */
 const assert = require("node:assert/strict");
 const fs = require("node:fs"), http = require("node:http"), path = require("node:path");
 const { chromium } = require("playwright");
@@ -21,10 +22,13 @@ const ROOT = path.resolve(__dirname, "..");
     browser = await chromium.launch(); const page = await browser.newPage();
     await page.goto(`http://127.0.0.1:${server.address().port}/eval/harness.html`);
     const labels = JSON.parse(fs.readFileSync(path.join(ROOT, "test-sets/labels.json"), "utf8"));
-    const results = await page.evaluate(async labels => {
+    const keys = ["bottom-rim-regression/photos/01.png", "bottom-rim-regression/photos/02.png"];
+    if (process.argv.includes("--include-real")) keys.push("lacma-168564/photos/04.jpg");
+    for (const key of keys) assert.ok(fs.existsSync(path.join(ROOT, "test-sets", key)), "Fetch the fixture first: " + key);
+    const results = await page.evaluate(async ({ labels, keys }) => {
       const rows = [];
-      for (const file of ["01.png", "02.png"]) {
-        const key = "bottom-rim-regression/photos/" + file, original = await loadCanvas("/test-sets/" + key);
+      for (const key of keys) {
+        const file = key.split("/").pop(), original = await loadCanvas("/test-sets/" + key);
         for (const scale of [0.75, 1, 1.5]) {
           const cv = document.createElement("canvas"); cv.width = Math.round(original.width * scale); cv.height = Math.round(original.height * scale);
           cv.getContext("2d").drawImage(original, 0, 0, cv.width, cv.height);
@@ -39,7 +43,7 @@ const ROOT = path.resolve(__dirname, "..");
         }
       }
       return rows;
-    }, labels);
+    }, { labels, keys });
     console.table(results);
     for (const result of results) {
       assert.ok(result.bottomErrorPct < 2, JSON.stringify(result));
@@ -62,7 +66,7 @@ const ROOT = path.resolve(__dirname, "..");
     assert.equal(await page.evaluate(() => cur), 1);
     fs.mkdirSync(path.join(ROOT, "eval/out"), { recursive: true });
     await page.screenshot({ path: path.join(ROOT, "eval/out/bottom-rim-fix.png"), fullPage: true });
-    console.log("Both base regressions passed at three image sizes, repeated canvas reads, and Upload → Map Rims.");
+    console.log("Base regressions passed at three image sizes, repeated canvas reads, and Upload → Map Rims.");
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));
