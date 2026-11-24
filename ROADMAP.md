@@ -31,11 +31,28 @@ Baseline (6 synthetic scenes, mean):
 
 On real photos the red-pixel rim scan often fails outright (e.g. the Met set, where the rims leave the image). Targets: rim error < 1% H (Phase 2), oracle angle error < 2° (Phase 3).
 
+## Current goal: in-browser cylinder compositor (replaces the Hugging Face stitch)
+
+Treat the vessel as a known surface and the rollout as its texture map: estimate each photo's camera from its two rim ellipses, project the photo onto the cylinder (angle θ, height h), line up neighbouring views with a horizontal θ shift, make the shifts add up to 360°, and blend each output column from the photo that sees it most face-on. Runs fully in the browser, no server.
+
+Each milestone is done when its target is met in `node scripts/eval.js`.
+
+| # | Milestone | Target (how it's measured) |
+|---|---|---|
+| M0 | **Yardstick.** (a) Synthetic multi-view scenes: render N views of one textured cylinder at known rotations, so the true rollout and true shifts are known. (b) End-to-end rollout score vs ground truth (synthetic texture; published rollouts for Met 310364 and pca4sale 446) after global registration (circular x shift + scale): median local column displacement (% of circumference), NCC, and seam ghosting. (c) Sanity row: unwarp with the synthetic scene's true camera. | (c) scores ≤0.5° angle error (proves the metric). Baseline numbers recorded for the current pipeline. |
+| M1 | **Projective unwarp.** Per-photo pose from the ellipses (elevation from b/a, distance from apparent size/taper, focal from EXIF or a default), sample the cylinder through a pinhole camera; each view's visible angle range computed, not assumed 180°. | Synthetic, true rims: ≤1° median angle error at 0–60° from facing. With detected rims: ≤3°. |
+| M2 | **Registration.** Pairwise θ shift between neighbouring views by normalised cross-correlation on their overlap; global solve with loop closure (shifts sum to 360°) when coverage is complete; per-set coverage reported. | Synthetic: shift error ≤1°. Real sets with full coverage: loop-closure residual ≤3°. |
+| M3 | **Compositing.** Blend weighted by how face-on each view is (cos of incidence), seams placed where views agree; uncovered angles shown as an explicit gap, never stretched. | End-to-end vs published rollouts: median column displacement ≤1% of circumference, no visible seams on review; synthetic ≤0.5%. |
+| M4 | **In the app.** New Stitch step uses the compositor (Hugging Face kept as fallback until M3 passes); progress shown, no network. | 5 photos stitched in ≤10 s on a laptop browser; works offline. |
+| M5 | **Clean-up.** Remove the Hugging Face call and simplify the Refine step if the composite no longer needs manual rectification. | No external calls in the stitch path. |
+
+Out of scope for now: SAM-class segmentation (only if rim errors limit M3), video/turntable mode, multi-view bundle adjustment.
+
 ## Status / handoff (latest)
 
 - App default rim detector: `RIM2.detect` (A2) in `js/core/rim-detect-v2.js`; the old one is the fallback in `js/steps/1-upload.js`.
 - Measure any change with `node scripts/eval.js` (needs `python3 scripts/fetch_test_sets.py` once). Use `--only "A2 two-class,..."` to keep the report readable; check real photos visually, since synthetic floor shadows are harsher than real ones.
-- Next steps: Phase 2 failures 2–4 below, then Phase 3 (perspective-correct unwarp using the fitted ellipses `b.topE`/`b.botE`, with `s` = top-rim curve direction). The oracle row's 12–15° error is the target to remove.
+- Next steps: the compositor milestones above (M0 first). Rim detection is good enough on real photos (~1–2%) that stitching is now the bottleneck.
 
 ## Phase 2: automatic rim recognition
 
@@ -107,6 +124,26 @@ Ten further LACMA labels bring the total to 52, with all existing coordinates pr
 
 Measured with the same Playwright Chromium comparison and procedural synthetic texture fallback. All pipelines completed successfully.
 
+### Bottom-rim regressions from supplied dark-backdrop photos
+
+Two supplied PNG screenshots are checked in under `test-sets/bottom-rim-regression/photos/`, with hand-labelled front base arcs. The evaluator includes each at 75%, 100% and 150% size through `meta.json`'s `evaluationScales`, since the first failure depends on resampling.
+
+- A dark painted band can truncate the initial mask halfway down the vessel. The refinement previously searched only 15% below that incomplete component. When the initial bottom fit is flat and ends well above the image border, refinement now searches the remaining rows and permits a longer gap to an aligned base fragment.
+- A floor patch can join the refined mask below an already rounded base. The detector now trims a sudden widening after the silhouette has tapered. If the patch has grown gradually, it retains the initial rounded base when refinement extends substantially lower and the initial base has comparable width.
+
+| case | bottom error before %H | bottom error after %H |
+|---|---:|---:|
+| Left photo, 75% size, mid-body cutoff | 42.47 | 0.53 |
+| Left photo, original size | 0.41 | 0.49 |
+| Left photo, 150% size | 0.46 | 0.55 |
+| Right photo, 75% size, floor leak | 12.49 | 0.30 |
+| Right photo, original size, floor leak | 12.18 | 0.34 |
+| Right photo, 150% size, floor leak | 13.66 | 0.28 |
+
+The six regression cases average 13.61 → 0.42%H bottom error. The 27 previously available labelled photos retain their exact rim scores (bottom mean 1.42%H). All nine synthetic scenes retain their exact rim scores (top 3.22%H, bottom 5.51%H). The combined 33 labelled cases score 3.63 → 1.24%H bottom error. Met collection photos remain unavailable for this run.
+
+Reproduce with `node scripts/eval.js --only "A2 before base fix,A2 two-class"`. Run `node scripts/check_bottom_rims.js` for assertions on both supplied photos at all three sizes and three repeated canvas reads, plus the normal Upload → Map Rims path. Each base curve and front midpoint must be within 2% of vessel height, and endpoint x error must be under 5% of rim width. The report is `eval/out/report.html`, and the upload preview is `eval/out/bottom-rim-fix.png`.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):
@@ -150,6 +187,12 @@ A circle seen by a pinhole camera is **exactly an ellipse**, which is the key st
 5. **Cross-photo consistency.** All photos of one object usually share a camera setup, so a median of the ellipse parameters is a strong prior for outlier photos.
 
 ## Phase 3: automatic depth/perspective correction
+
+### Automatic camera and rotation estimation checkpoint
+
+Draft implementation and handoff details are in `HANDOFF.md`, with the complete experiment recorded in `eval/automatic-rollout-results.json`. Camera candidates come from the two rim conics, shared vessel-height hypotheses stabilize per-photo fits, and overlapping painted detail jointly selects cameras and relative rotations. The estimator receives photographs and rim handles.
+
+Across all 12 synthetic sets, the detected-rim automatic pipeline improves mean full-rollout angular MAE from **3.154° to 0.945° (70.0%)**. The reframed procedural set scores 0.185°, including a photo with a cropped bottom rim. Real pca4sale photo matching remains disconnected, close-view rotation outliers remain, and production app integration is pending. These limitations are documented in the handoff and the draft PR.
 
 ### Yardstick milestone
 

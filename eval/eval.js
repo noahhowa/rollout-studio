@@ -159,7 +159,13 @@ window.runEval = async function (job) {
     cases.push({ group: "synthetic", id: p.id, params: p, visHalfDeg: s.truth.visHalfDeg, overlay: toJpeg(overlay(s.canvas, res, s.truth), 420), results: res.map(strip0) });
   }
   for (var k = 0; k < job.real.length; k++) {
-    var rc = job.real[k], cv = await loadCanvas(rc.src), rr = runPipelines(cv, null), lt = null;
+    var rc = job.real[k], cv = await loadCanvas(rc.src), lt = null;
+    if (rc.scale && rc.scale !== 1) {
+      var resized = document.createElement("canvas");
+      resized.width = Math.round(cv.width * rc.scale); resized.height = Math.round(cv.height * rc.scale);
+      resized.getContext("2d").drawImage(cv, 0, 0, resized.width, resized.height); cv = resized;
+    }
+    var rr = runPipelines(cv, null);
     if (rc.label && !rc.label.unusable) {
       lt = labelTruth(rc.label, cv.width, cv.height);
       rr.forEach(function (r) { if (r.b) { r.rim = rimError(r.b, lt); r.side = sideError(r.b, lt); } });
