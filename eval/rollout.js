@@ -56,6 +56,17 @@ var ROLLOUT = (function () {
         return { color: sample(color, x, y), uv: value };
       } };
   }
+  function flattenEstimated(view, bounds, camera, rotation) {
+    if (!camera) { var old = flattenWithApp(view, bounds); old.rotation = rotation; return old; }
+    var size = { width: 720, height: 240, bounds: bounds }, radius = hGeom(bounds).r;
+    var color = pixels(ROLLCAMERA.flatten(view.canvas, camera, radius, size));
+    var uv = view.coordinates ? pixels(ROLLCAMERA.flatten(view.coordinates, camera, radius, size)) : null;
+    return { rotation: rotation, canvas: canvas(color.data, color.width, color.height), image: color,
+      read: function (theta, v) {
+        var x = (theta / Math.PI + 0.5) * (color.width - 1), y = v * (color.height - 1);
+        return { color: sample(color, x, y), uv: uv && sample(uv, x, y) };
+      } };
+  }
   function compose(strips) {
     var data = new Uint8ClampedArray(WIDTH * HEIGHT * 4), angleErrors = [], heightErrors = [], covered = 0;
     var support = 0, expectedSupport = 0, half = Math.PI * (0.5 - CROP);
@@ -207,6 +218,28 @@ var ROLLOUT = (function () {
       rows.push({ id: textureId + "/" + scene.id, pipeline: pipeline, photos: views.length, rotationsDeg: rotations,
         geometry: result.geometry, texture: textureScore(result.canvas, texture, false), image: toJpeg(result.canvas, 1100) });
     }
+    for (var rimSource of ["true", "detected"]) {
+      var inputs = views.map(function (view) {
+        var cv = document.createElement("canvas"); cv.width = view.canvas.width; cv.height = view.canvas.height;
+        cv.getContext("2d").drawImage(view.canvas, 0, 0);
+        return { cv: cv, b: rimSource === "true" ? oracleB(view.truth) : RIM2.detect(cv) };
+      });
+      // The estimator receives photographs and bounds only. Truth is consulted after it returns.
+      var registration = ROLLREGISTER.estimate(inputs);
+      var strips = views.map(function (view, i) {
+        return flattenEstimated(view, inputs[i].b, registration.cameras[i], (registration.rotations[i] || 0) + views[0].rot);
+      });
+      var result = compose(strips);
+      var productionRegistration = Object.assign({}, registration, { rotations: registration.rotations.map(function (angle) { return (angle || 0) + views[0].rot; }) });
+      var productionStrips = strips.map(function (strip) { return strip.canvas || canvas(strip.image.data, strip.image.width, strip.image.height); });
+      var assembly = ROLLREGISTER.compose(inputs, productionRegistration, productionStrips, { width: WIDTH, height: HEIGHT, fullCircle: true });
+      var assembled = assembly ? assembly.canvas : result.canvas;
+      var rotationError = mean(registration.rotations.map(function (angle, i) { return Math.abs(wrap((angle || 0) + views[0].rot - views[i].rot)) * 180 / Math.PI; }));
+      rows.push({ id: textureId + "/" + scene.id, pipeline: rimSource + " rims + estimated camera and rotations", photos: views.length,
+        rotationsDeg: registration.rotations.map(function (angle) { return angle * 180 / Math.PI; }), registration: registration,
+        rotationMAEDeg: rotationError, assemblyCoveragePct: assembly && assembly.coveragePct,
+        geometry: result.geometry, texture: textureScore(assembled, texture, false), image: toJpeg(assembled, 1100) });
+    }
     var controls = null;
     if (textureId === "procedural" && scene.id === "studio") {
       var wrong = views.map(function (view) {
@@ -219,15 +252,20 @@ var ROLLOUT = (function () {
     return { controls: controls, source: toJpeg(texture, 1100), photos: views.map(function (v) { return toJpeg(v.canvas, 160); }), rows: rows };
   }
   async function published(item, reference, sources) {
-    var strips = [], registrations = [];
+    var strips = [], registrations = [], inputs = [];
     for (var src of sources) {
-      var cv = await loadCanvas(src), strip = flattenWithApp({ canvas: cv, rot: 0 }, RIM2.detect(cv));
+      var cv = await loadCanvas(src), bounds = RIM2.detect(cv), strip = flattenWithApp({ canvas: cv, rot: 0 }, bounds);
+      inputs.push({ cv: cv, b: bounds });
       var similarity = inferRotation(strip, reference);
       registrations.push({ src: src, rotationDeg: strip.rotation * 180 / Math.PI, correlation: similarity }); strips.push(strip);
     }
     if (!strips.length) return { id: item.id, status: "missing photos", reference: toJpeg(reference, 1100), source: item.source };
     var result = compose(strips);
-    return { id: item.id, status: "scored", photos: strips.length, source: item.source, registrations: registrations,
+    var estimated = ROLLREGISTER.estimate(inputs);
+    var corrected = inputs.map(function (input, i) { return ROLLCAMERA.flatten(input.cv, estimated.cameras[i], hGeom(input.b).r, { width: 720, height: 240, bounds: input.b }); });
+    var automatic = ROLLREGISTER.compose(inputs, estimated, corrected, { width: WIDTH, height: HEIGHT, fullCircle: true });
+    var automaticScore = automatic ? { registration: estimated, coveragePct: automatic.coveragePct, texture: textureScore(automatic.canvas, reference, true), image: toJpeg(automatic.canvas, 1100) } : { registration: estimated, status: "disconnected matches" };
+    return { automatic: automaticScore, id: item.id, status: "scored", photos: strips.length, source: item.source, registrations: registrations,
       geometry: result.geometry, texture: textureScore(result.canvas, reference, true), reference: toJpeg(reference, 1100), image: toJpeg(result.canvas, 1100) };
   }
   return { makeTexture: makeTexture, synthetic: synthetic, published: published, loadReference: loadReference, textureScore: textureScore, compose: compose };
