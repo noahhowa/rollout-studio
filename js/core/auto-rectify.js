@@ -31,8 +31,8 @@ var AUTORECT = (function () {
     var typical = median(lens); if (!typical) { api.reason = 'no content'; return null; }
     var valid = []; for (col = 0; col < W; col++) if (tops[col] >= 0 && bots[col] - tops[col] >= 0.6 * typical) valid.push(col);
     if (valid.length < W * 0.3) { api.reason = 'too few full-height columns: ' + valid.length + '/' + W + ', typical ' + typical; return null; }
-    function smooth(arr, col0) { // median of valid columns within +-6
-      var vals = []; for (var k = -6; k <= 6; k++) { var cc = col0 + k; if (cc >= 0 && cc < W && arr[cc] >= 0 && bots[cc] - tops[cc] >= 0.6 * typical) vals.push(arr[cc]); }
+    function smooth(arr, col0) { // median of valid columns within +-20 (about +-2.5% of width; tuned on the ground truth)
+      var vals = []; for (var k = -20; k <= 20; k++) { var cc = col0 + k; if (cc >= 0 && cc < W && arr[cc] >= 0 && bots[cc] - tops[cc] >= 0.6 * typical) vals.push(arr[cc]); }
       return vals.length ? median(vals) : null;
     }
     var first = valid[0], last = valid[valid.length - 1], n = 32, top = [], bot = [], inset = 0.01 * typical;
@@ -121,7 +121,9 @@ var AUTORECT = (function () {
     var good = blocks.filter(function (bl) { return bl.ok; }).length;
     api.painted = { blocks: blocks.length, aligned: good };
     function corrAt(c6) { var bi = Math.max(0, Math.min(blocks.length - 1, Math.floor((c6 - first) / BW))); return blocks[bi]; }
-    var useProfile = !api.outlineOnly && good >= 0.6 * blocks.length, insetR = 0.01 * typical;
+    // Experimental and OFF by default: on the hand-labelled ground truth (scripts/eval-rectify.js)
+    // the outline-only lines scored 1.78% vs 4.57% for this alignment (no rectify: 3.78%).
+    var useProfile = !!api.experimentalProfile && good >= 0.6 * blocks.length, insetR = 0.01 * typical;
     for (var k2 = 0; k2 <= n; k2++) {
       var cx = Math.round(first + (last - first) * k2 / n), t = smooth(tops, cx), b = smooth(bots, cx);
       if (t === null || b === null) continue;

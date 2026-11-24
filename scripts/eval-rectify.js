@@ -5,7 +5,8 @@
    For each panorama this runs the app's own auto-detection (AUTORECT.bandLines) and maps every
    labelled line through the same per-column remap doRectify() applies, then reports how far the
    line is from level: RMS and max deviation as % of the rectified band height, before and after.
-   Usage: node scripts/eval-rectify.js        (needs Playwright + Chromium) */
+   Usage: node scripts/eval-rectify.js        (needs Playwright + Chromium)
+   PROFILE=1 scores the experimental painted-band alignment instead of the default outline lines. */
 const http = require("http"), fs = require("fs"), path = require("path");
 const { chromium } = require("playwright");
 const ROOT = path.resolve(__dirname, "..");
@@ -24,7 +25,7 @@ const stitched = JSON.parse(fs.readFileSync(path.join(ROOT, "test-sets/stitched.
   const browser = await chromium.launch(), page = await browser.newPage();
   await page.route(/googletag|fonts\.g/, (r) => r.abort());
   await page.goto(`http://localhost:${port}/`);
-  if (process.env.OUTLINE_ONLY) await page.evaluate(() => { window.OUTLINE_ONLY = true; });
+  if (process.env.PROFILE) await page.evaluate(() => { window.PROFILE = true; });
   const rows = [];
   for (const [id, lab] of Object.entries(labels)) {
     const s = stitched.find((x) => x.id === id);
@@ -32,7 +33,7 @@ const stitched = JSON.parse(fs.readFileSync(path.join(ROOT, "test-sets/stitched.
     rows.push(await page.evaluate(async ({ id, file, lines }) => {
       const im = new Image(); im.src = "/" + file; await im.decode();
       const cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; cv.getContext("2d").drawImage(im, 0, 0);
-      const W = cv.width, H = cv.height; AUTORECT.outlineOnly = !!window.OUTLINE_ONLY; const auto = AUTORECT.bandLines(cv);
+      const W = cv.width, H = cv.height; AUTORECT.experimentalProfile = !!window.PROFILE; const auto = AUTORECT.bandLines(cv);
       // the remap doRectify() applies, inverted for a source point (x, srcY) -> output y
       function mapper(top, bot) {
         const tS = [], bS = [];
