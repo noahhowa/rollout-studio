@@ -30,3 +30,6 @@ function med(a) {
   });
   return s[s.length >> 1];
 }
+// Auto-order photos before stitching (Adjust step checkbox). Off by default: the upload order is
+// trusted unless the user asks for reordering.
+var autoOrderOn = false;

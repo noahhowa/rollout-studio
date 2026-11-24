@@ -21,7 +21,8 @@ function renderAdjust() {
   var chk = document.createElement("div");
   chk.className = "chk-row";
   chk.innerHTML =
-    '<input type="checkbox" id="cropToggle" checked><label for="cropToggle">' + t("smartCrop") + "</label>";
+    '<input type="checkbox" id="autoOrderToggle"' + (autoOrderOn ? " checked" : "") + '><label for="autoOrderToggle">' + t("autoOrder") + "</label>";
+  chk.querySelector("input").onchange = function () { autoOrderOn = this.checked; };
   card.appendChild(chk);
   var sep = document.createElement("div");
   sep.style.cssText = "height:1px;background:var(--border-lt);margin:14px 0";
