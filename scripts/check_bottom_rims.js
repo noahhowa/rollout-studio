@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* Regression checks for dark-backdrop photos. Needs Playwright + Chromium.
-   Add --include-real after fetching lacma-168564 to check the shallow-band regression too. */
+   Add --include-real after fetching lacma-168564. Use --shell for the old test renderer. */
 const assert = require("node:assert/strict");
 const fs = require("node:fs"), http = require("node:http"), path = require("node:path");
 const { chromium } = require("playwright");
@@ -19,7 +19,7 @@ const ROOT = path.resolve(__dirname, "..");
   let browser;
   try {
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-    browser = await chromium.launch(); const page = await browser.newPage();
+    browser = await chromium.launch({headless:true, channel:process.argv.includes("--shell") ? undefined : "chromium"}); const page = await browser.newPage();
     await page.goto(`http://127.0.0.1:${server.address().port}/eval/harness.html`);
     const labels = JSON.parse(fs.readFileSync(path.join(ROOT, "test-sets/labels.json"), "utf8"));
     const keys = ["bottom-rim-regression/photos/01.png", "bottom-rim-regression/photos/02.png"];

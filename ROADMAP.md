@@ -266,6 +266,68 @@ The browser report exposes remaining substantial failures. `edge-sothebys-2026-s
 
 The two exact gray-backdrop originals still need user hand labels. The labeller now supports explicitly selected local fixture metadata outside the download manifest, with no remote URL required. The verified queue is `eval/label.html?sets=top-rim-regression&unlabelled=1`. Until those labels arrive, their regression checks use approximate visible-edge corridors only.
 
+### Fix the largest upload-path failures
+
+Continued from PR #19's browser-validation head (`33bf127`). All browser work in this pass used isolated headless processes. The 50 available labelled source photos are scored through actual uploads in full Chromium 159.0.8154.6, including the app's resize to 1200 pixels wide. The 25 Met photos remain unavailable. These labels guided the changes, so this is a regression benchmark rather than a held-out generalization estimate.
+
+| actual upload metric | before investigation | kept changes | reduction |
+|---|---:|---:|---:|
+| Top rim %H | 1.2263 | 1.2195 | 0.6% |
+| Bottom rim %H | 2.2718 | 1.1650 | **48.7%** |
+| Top ends %W | 4.3495 | 1.6411 | **62.3%** |
+| Bottom ends %W | 3.5516 | 2.2346 | **37.1%** |
+
+The standard detector-only comparison has 54 cases because it also includes PNG size variants and uses the original image sizes. Its top/bottom errors change 1.2597/1.9320 → 1.2510/1.3184%H, and endpoints 3.9035/4.0740 → 2.1559/2.5788%W. Synthetic top remains 3.2246%H. Synthetic bottom improves 5.5106 → 3.7376%H, entirely from `floor-grey` improving 16.607 → 0.651%H; every other synthetic rim score is unchanged. Synthetic detector runtime in this run was approximately 82 → 88 ms per scene, rather than a dedicated performance benchmark.
+
+Kept behavior:
+
+- When refinement nearly doubles a flat rim's width, retain the initial rim ends only if its axis agrees with the refined axis. Preserve the current curve height. This removes textured-backdrop wings without imposing the initial top's sometimes incorrect curvature.
+- Detect a floor patch that reconnects through a narrow waist, including a gradual widening. Cut at the waist only near or below the initial base. The lower bound prevents the stone-floor horizon from being mistaken for the vessel bottom.
+- Retain an initial rounded base when its radius agrees with the recovered top and the two bottom fits reach the same vertical region. This rejects widened floor components that the earlier similarly-wide-base guard could not handle.
+- Confirm suspicious bases against image edges. Fit coherent side generators over the body, find where they end, and search a constrained ellipse family nearby. Require background-colour support below the proposed arc at several depths, using reference colours outside both the side lines and the top rim. Shared-radius checks reject proposals that move farther from plausible vessel geometry.
+- For an already well-positioned base with inconsistent width or axis, search locally while anchoring the front middle. Require support in both outer arc sectors and use the lower body rather than a wider shoulder for the width prior. A shallow inner-foot fit under an open top is checked around the full body width. Local fitting cannot replace a confirmed generator width with a worse shared-radius fit.
+
+Largest addressed cases in actual uploads:
+
+| photo | metric | before | after |
+|---|---|---:|---:|
+| `edge-sothebys-2026-stone-floor/01.jpg` | top ends %W | 30.42 | 2.69 |
+| `edge-sothebys-2026-stone-floor/02.jpg` | top ends %W | 44.61 | 1.65 |
+| `edge-sothebys-2026-stone-floor/03.jpg` | top ends %W | 38.79 | 5.75 |
+| `edge-sothebys-2026-stone-floor/04.jpg` | top ends %W | 32.58 | 0.88 |
+| `lacma-168564/05.jpg` | bottom %H / ends %W | 21.87 / 20.70 | 0.43 / 0.69 |
+| `lacma-168564/02.jpg` | bottom %H / ends %W | 15.59 / 11.19 | 0.70 / 0.90 |
+| `bottom-rim-regression/01.png` | bottom %H | 8.09 | 0.54 |
+
+Approaches and counterexamples were checked before retaining them:
+
+| trial / refinement | measured finding | outcome |
+|---|---|---|
+| Initial-width fallback without an axis check | The stone-floor ends improved, but `lacma-168564/02.jpg` top ends worsened 7.68 → 26.85%W because its initial component covers only part of the vessel. | Added axis agreement; partial-component fallback removed. |
+| Unbounded waist trimming | Actual bottom mean worsened 2.27 → 2.90%H because the stone-floor horizon was cut above the base. | Bound cuts by the initial bottom; the kept width/waist stage reached 1.61%H. |
+| Connected horizontal expansion at a clipped refinement ROI | Actual bottom mean worsened 1.61 → 2.13%H, including `lacma-168564/03.jpg` at 1.36 → 26.66%H. | Removed. Restoring a side also grew floor material. |
+| Connected recovery above a flat mask for missing dark lips | No measurable improvement on either the 50 upload cases or the 54 detector cases. | Removed, including the experimental direction rule. |
+| Side-generator / gradient base search alone | Found the remaining dark base, but `pca4sale-446/04.jpg` worsened 3.23 → 21.96%H. Synthetic gains alone did not justify keeping it. | Raw search removed; require background farther below the arc. |
+| Background confirmation using samples just outside fitted side lines | Some fitted lines were inside the vessel, making painted material look like background; the pca outlier reached 26.63%H. | Move references outside the top extent too, check three lower layers, and enforce radius agreement. The four pca upload cases retain their prior scores. |
+| Rounded-base / top-radius agreement | The stone-floor first and second bottom-end errors improve 19.90 → 6.98 and 15.60 → 3.44%W. | Kept with a close-front-height requirement. |
+| Local endpoint fitting with a middle-body width prior | An existing full-Chromium resized-end failure remained, and a wider shoulder could replace a correct tapered base. | Use lower-body spans, balanced outer-arc support, and preserve the generator radius when arbitrating fits. |
+
+The full-Chromium bottom regression now passes at three sizes and three repeated reads without relaxing its limits: curve/middle <2%H and ends <5%W. For example, the second PNG at 75% size improves 11.14 → 2.29%W ends, and the additional LACMA fixture at 150% size improves 9.98 → 2.01%W. The original headless-shell suite also passes. The two supplied gray-backdrop top fixtures still pass their separate visual corridors, uploads and Reset checks; they have no user hand labels and remain outside the aggregate metrics.
+
+Reproduce final validation with a local server on port 8765:
+
+```
+node scripts/check_browser_rims.js --assert-regressions
+node scripts/eval.js --only "A2 before failure fixes,A2 two-class"
+node scripts/check_bottom_rims.js --include-real
+node scripts/check_bottom_rims.js --include-real --shell
+node scripts/check_top_rim.js
+```
+
+`check_browser_rims.js` also accepts `--sets`, `--opts` and `--tag` for controlled comparisons. To reproduce the investigation baseline, pass `--opts '{"rimWidthPrior":false,"trimNecks":false,"imageBase":false,"consistentBase":false}' --tag before-failures`. The final report is `eval/out/browser-rims-local.html`; the saved side-by-side comparison for this run is `eval/out/rim-failure-comparison.html`. All 50 scores complete without page errors, and explicit regression limits cover the four stone-floor photos, both severe LACMA base leaks, the PNG cutoff and all four pca controls.
+
+Remaining failures are concentrated in missing dark lips and partial masks. The bird-vessel top errors remain 6.22 and 5.59%H because the colour mask starts below the black lip and the top direction is ambiguous. `lacma-168550/02.jpg` still has 4.95%H top error. `lacma-168564/03.jpg` retains 10.73/14.45%W top/bottom endpoint error from an incomplete component; the rejected ROI extension shows why widening that search indiscriminately is unsafe. `lacma-140748/02.jpg` is the largest remaining bottom-curve case at 5.34%H: its silhouette includes the dark foot/support below the labelled cylinder edge. `pca4sale-446/02.jpg` remains at 3.80%H where the base blends into its support. The nearly edge-on `edge-sothebys-2024-polychrome/01.jpg` still has 11.25%W bottom-end error; a narrow inner-foot ellipse matches the central curve and lacks enough opening evidence to select the full base confidently. One tradeoff is `lacma-140750/01.jpg`: bottom curve improves 3.38 → 0.63%H while ends worsen 3.03 → 4.74%W. Native-size detector-only results still include a large `lacma-168564/02.jpg` bottom error, although the actual 1200-pixel upload path is corrected. The whole-rollout camera/registration benchmark was not rerun.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):
