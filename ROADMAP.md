@@ -225,6 +225,47 @@ On the second supplied PNG, the front middle moves from y=153.58 to y=204.11 and
 
 The user's deployed URL is GitHub Pages. Its served detector and Map code matched the preceding merged patch, but the horizontal, extra-wide line in the first screenshot could not be reproduced on a fresh upload of that source. An already-open tab or cached script remains a possible explanation; this has not been confirmed in the user's browser. The application now versions the detector and Map script URLs so a refreshed page requests the updated assets after deployment. Saved rim coordinates still need Reset or re-upload to be recomputed. This follow-up does not change camera/registration geometry or rerun the whole-rollout benchmark.
 
+### Browser upload validation against hand labels
+
+The user's Chrome screenshots still failed after PR #18. The deployed detector matched the merged code, and a fresh upload reproduced the oversized top in full Chromium. Playwright's default headless shell had hidden this failure. Full Chromium can reproduce the same rendering path with `channel: "chromium", headless: true`, without opening a desktop browser or accessing a personal profile. Later tests use that mode. Renderer-dependent canvas/image sampling changes masks enough to invalidate the earlier assumption that a headless-shell pass predicts normal Chrome results.
+
+Added `scripts/check_browser_rims.js` to upload every available hand-labelled source through the actual app, including its 1200-pixel upload resize. It measures the same rim and endpoint errors as the evaluator, renders the app's Map cards, and overlays the committed labels in cyan. Exact click positions are drawn separately from the evaluator's axis-aligned truth arcs. Reports and coordinates are written to `eval/out/browser-rims-deployed.{html,json}` or `browser-rims-local.{html,json}`. The test opens no desktop windows. With a local server on port 8765, reproduce using:
+
+```
+node scripts/check_browser_rims.js --url https://noahhowa.github.io/rollout-studio/
+node scripts/check_browser_rims.js
+```
+
+This sample contains 50 unique available source photos. The 25 Met photos remain missing. It differs from the 54-case detector-only benchmark, which includes PNG scale variants and does not apply the app's upload resize.
+
+| actual uploads, full Chromium headless | top %H | bottom %H | top ends %W | bottom ends %W |
+|---|---:|---:|---:|---:|
+| Deployed PR #18 baseline | 1.2324 | 2.2718 | 4.3495 | 3.5516 |
+| Browser guards | 1.2263 | 2.2718 | 4.3495 | 3.5516 |
+
+The aggregate improvement is small. Only the bird vessel's second photo changes on these 50 source uploads, from 5.8922 to 5.5869%H top error. The standard 54-case evaluator changes top 1.260319 → 1.259726%H, with bottom 1.931983%H and ends 3.903487/4.073964%W unchanged. All nine synthetic scenes retain their scores, top 3.224620%H and bottom 5.510605%H. These are separate measurements and should not be combined.
+
+Kept changes address the exact browser regressions:
+
+- Reject extreme growth of a nearly flat top if several upper-body rows support a narrower width close to the initial fit. On `top-rim-regression/01.png`, full Chromium's top width changes from 649.65 to 502.68 pixels, close to the approximately 510-pixel visible lip. The default headless shell had already returned a width near 517 pixels. This fixture has no user hand labels, so its visual bounds are excluded from aggregate ground-truth scores.
+- Preserve a curved initial opening when a later flat fit of comparable width jumps above its back rim. Restricting the width comparison avoids imposing false positive curvature on the stone-floor vessel.
+- Seed the tilted-lip line with median pair slopes and intercepts, then reject outliers before least squares. Accept 18 supported columns only if they span both sides; the earlier 20-column threshold rejected coherent tilted edges at another scale.
+
+`node scripts/check_top_rim.js` now uses full Chromium headlessly by default; `--shell` checks the old runner too. Both supplied originals pass at three sizes, three repeated reads, normal uploads and Reset. Reset is checked against visual corridors rather than bit-identical coordinates, since Chrome can change its canvas sampling path after readback. The first fixture's existing endpoint tolerances remain intact. The corrected two-photo Map preview is `eval/out/top-rim-fix.png`. The detector/Map script URL versions are updated for deployment.
+
+Rejected experiments in this pass:
+
+| experiment | finding |
+|---|---|
+| CPU-backed resize target | No correction of the oversized browser rim; removed. |
+| CPU-backed upload canvas | Did not stabilize the fit and could flatten the tilted line; removed. |
+| Explicit bilinear sampler | Standard real bottom worsened 1.932 → 2.367%H and synthetic bottom 5.511 → 6.242%H; removed. |
+| Broader back-edge fallback | Standard top worsened 1.260 → 1.309%H while top ends improved 3.903 → 3.276%W. It restored the wrong curvature on the stone-floor vessel. Restricted to comparable widths in the kept guard. |
+
+The browser report exposes remaining substantial failures. `edge-sothebys-2026-stone-floor/02.jpg` has 44.605%W top endpoint error; `/03.jpg` has 38.792%W. `lacma-168564/05.jpg` has 21.867%H bottom and 20.702%W bottom endpoint error, and `/02.jpg` has 15.589%H bottom error. Even the previously checked-in `bottom-rim-regression/01.png` has 8.088%H bottom error in this browser path. Dark paint, contact shadows and background fragments still produce incorrect masks. These failures remain visible in the cyan-label report; this patch does not resolve them or claim a broad detector improvement. The whole-rollout benchmark was not rerun.
+
+The two exact gray-backdrop originals still need user hand labels. The labeller now supports explicitly selected local fixture metadata outside the download manifest, with no remote URL required. The verified queue is `eval/label.html?sets=top-rim-regression&unlabelled=1`. Until those labels arrive, their regression checks use approximate visible-edge corridors only.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):

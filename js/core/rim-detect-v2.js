@@ -298,8 +298,21 @@ var RIM2 = (function () {
       topH: toHandles(top), botH: toHandles(bot), topE: top, botE: bot };
   }
 
-  function recoverFlatRimWidth(e, mask, W, height) {
+  function recoverFlatRimWidth(e, mask, W, height, initial) {
     if (e.b >= 0.07 * e.a) return;
+    // Refined backdrop pixels can widen a flat top far beyond the vessel. Confirm
+    // that growth against several rows inside the upper body before keeping it.
+    if (initial && e.a > 1.25 * initial.a) {
+      var centers = [], radii = [];
+      for (var row = 0; row < 7; row++) {
+        var body = rowSpan(mask, W, Math.round(e.yc + height * (0.06 + 0.01 * row)));
+        if (body) { centers.push((body.l + body.r) / 2); radii.push((body.r - body.l) / 2); }
+      }
+      var radius = median(radii);
+      if (radii.length >= 5 && radius > 0.85 * initial.a && radius < 1.2 * initial.a && e.a > 1.2 * radius) {
+        e.xc = median(centers); e.a = radius; return;
+      }
+    }
     // A nearly flat rim can cross a row where the mask clips a pale or thin lip.
     // Use several rows just inside the body to recover the ends, with a bounded expansion.
     var left = [], right = [];
@@ -369,7 +382,7 @@ var RIM2 = (function () {
 
   // A flat but tilted lip cannot pass the axis-aligned arc residual check.
   // Recover a coherent local line, keeping its width and rejecting painted-band jumps.
-  function refineTiltedLip(cv, e, height) {
+  function refineTiltedLip(cv, e, height, minSupport) {
     if (e.b > 0.03 * e.a) return;
     var blur = Math.max(1, Math.round(cv.width / WORK)), reach = 0.035 * height;
     var y0 = Math.max(0, Math.floor(e.yc - reach - blur - 1));
@@ -382,6 +395,15 @@ var RIM2 = (function () {
     }
     if (pts.length < 20) return;
     var active = pts.slice(), yc, tilt;
+    if (minSupport < 20) {
+      // A few painted-band peaks can bias least squares before outlier rejection.
+      var slopes = [];
+      for (var l = 0; l < pts.length; l++) for (var r = l + 1; r < pts.length; r++) {
+        if (pts[r].x - pts[l].x > 0.4 * e.a) slopes.push((pts[r].y - pts[l].y) / (pts[r].x - pts[l].x));
+      }
+      tilt = median(slopes); yc = median(pts.map(function (p) { return p.y - tilt * p.x; }));
+      active = pts.filter(function (p) { return Math.abs(p.y - yc - tilt * p.x) < 2 * blur; });
+    }
     for (var it = 0; it < 3; it++) {
       if (active.length < 18) return;
       var sx = 0, sy = 0, sxx = 0, sxy = 0, n = active.length;
@@ -389,7 +411,8 @@ var RIM2 = (function () {
       tilt = (n * sxy - sx * sy) / (n * sxx - sx * sx); yc = (sy - tilt * sx) / n;
       active = active.filter(function (p) { return Math.abs(p.y - yc - tilt * p.x) < 2 * blur; });
     }
-    if (active.length < 20 || Math.abs(tilt) < 0.015 || Math.abs(tilt) > 0.15 || Math.abs(yc - e.yc) > reach) return;
+    if (active.length < minSupport || Math.abs(tilt) < 0.015 || Math.abs(tilt) > 0.15 || Math.abs(yc - e.yc) > reach) return;
+    if (active.length < 20 && (active[0].x > -0.5 * e.a || active[active.length - 1].x < 0.5 * e.a)) return;
     e.yc = yc; e.b = 0; e.tilt = tilt;
   }
 
@@ -442,9 +465,9 @@ var RIM2 = (function () {
     }
     if (!top || !bot) return null;
     // A small refinement artifact can pull the top fit onto a narrow, flat row.
-    // Preserve a curved initial opening when both its width and curvature collapse.
-    if (opts.stableTop !== false && initial.top && top.a < 0.85 * initial.top.a &&
-        initial.top.b > 0.06 * initial.top.a && top.b < 0.03 * top.a) top = initial.top;
+    // Preserve a curved initial opening if a flat fit loses width or jumps above its back rim.
+    if (opts.stableTop !== false && initial.top && initial.top.b > 0.06 * initial.top.a && top.b < 0.03 * top.a &&
+        (top.a < 0.85 * initial.top.a || (opts.browserFixes !== false && top.a <= 1.25 * initial.top.a && top.yc + top.b < initial.top.yc - 0.25 * initial.top.b))) top = initial.top;
     var bottomLimit = f.yMax;
     if (fixBase && opts.recoverBaseCurve !== false) {
       var recovered = recoverBaseCurve(mask, S.W, S.H, bot, f.yMin, f.yMax);
@@ -456,10 +479,10 @@ var RIM2 = (function () {
     top.s = opts.topDir || 1;
     var refine = opts.twoClass !== false && opts.refineRims !== false;
     var height = f.yMax - f.yMin;
-    if (refine) recoverFlatRimWidth(top, mask, S.W, height);
+    if (refine) recoverFlatRimWidth(top, mask, S.W, height, opts.browserFixes === false ? null : initial.top);
     top = scaleE(top, S.sc);
     if (refine && top.s === 1) refineFrontRim(cv, top, height / S.sc);
-    if (refine && opts.tiltedLip !== false) refineTiltedLip(cv, top, height / S.sc);
+    if (refine && opts.tiltedLip !== false) refineTiltedLip(cv, top, height / S.sc, opts.browserFixes === false ? 20 : 18);
     return toB(top, scaleE(bot, S.sc), f.yMin / S.sc, bottomLimit / S.sc);
   }
 

@@ -26,6 +26,7 @@ var PIPELINES = {
   "A2 before curve recovery": function (cv) { return RIM2.detect(cv, { recoverBaseCurve: false }); },
   "A2 before tilted lip": function (cv) { return RIM2.detect(cv, { tiltedLip: false }); },
   "A2 before top stability": function (cv) { return RIM2.detect(cv, { stableTop: false }); },
+  "A2 before browser fixes": function (cv) { return RIM2.detect(cv, { browserFixes: false }); },
   // A2 + Snap
   "A+snap": function (cv) {
     var b = RIM2.detect(cv), im = { cv: cv, b: b };
