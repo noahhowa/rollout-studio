@@ -35,7 +35,9 @@ for (const id of fs.readdirSync(path.join(ROOT, "test-sets"))) {
   if (process.env.PROFILE) await page.evaluate(() => { window.PROFILE = true; });
   if (process.env.PARAMS) await page.evaluate((p) => { Object.assign(AUTORECT.params, JSON.parse(p)); }, process.env.PARAMS);
   const rows = [];
-  for (const [id, lab] of Object.entries(labels)) {
+  const ids = new Set([...Object.keys(labels), ...stitched.filter((s) => s.failed).map((s) => s.id)]);
+  for (const id of ids) {
+    const lines = labels[id]?.lines || [];
     const s = stitched.find((x) => x.id === id);
     if (!s || !fs.existsSync(path.join(ROOT, s.file))) { rows.push({ id, missing: true }); continue; }
     rows.push(await page.evaluate(async ({ id, file, lines }) => {
@@ -65,7 +67,7 @@ for (const id of fs.readdirSync(path.join(ROOT, "test-sets"))) {
       }
       const bandH = auto ? mapper(auto.top, auto.bot).span : H * 0.7;
       return { id, auto: !!auto, reason: AUTORECT.reason, before: score(identity, bandH), after: auto ? score(mapper(auto.top, auto.bot), bandH) : null };
-    }, { id, file: s.file, lines: lab.lines }));
+    }, { id, file: s.file, lines }));
   }
   await browser.close(); server.close();
   const fmt = (v) => v == null ? "-" : v.toFixed(2);
@@ -75,6 +77,10 @@ for (const id of fs.readdirSync(path.join(ROOT, "test-sets"))) {
   for (const r of rows) {
     if (r.missing) { console.log(r.id.padEnd(44), "missing stitched image"); continue; }
     const b = r.before, a = r.after;
+    if (!b.length) {
+      console.log(r.id.padEnd(44), a ? "accepted (no labels)" : "declined (" + r.reason + ")");
+      continue;
+    }
     b.forEach((x) => B.push(x.rmsPct)); if (a) a.forEach((x) => A.push(x.rmsPct));
     console.log(r.id.padEnd(44), String(b.length).padEnd(5),
       (fmt(avg(b.map((x) => x.rmsPct))) + " / " + fmt(avg(b.map((x) => x.maxPct)))).padEnd(16),
