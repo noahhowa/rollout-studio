@@ -61,56 +61,64 @@
       "source": "met",
       "url": "https://www.metmuseum.org/art/collection/search/316711",
       "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/316711",
-      "title": "Vessel with Seated Lord"
+      "title": "Vessel with Seated Lord",
+      "note": "Met images can't be fetched by script (bot protection); browser hotlinking works."
     },
     {
       "id": "met-310607",
       "source": "met",
       "url": "https://www.metmuseum.org/art/collection/search/310607",
       "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/310607",
-      "title": "Vessel, Seated Deities"
+      "title": "Vessel, Seated Deities",
+      "note": "Met images can't be fetched by script (bot protection); browser hotlinking works."
     },
     {
       "id": "met-318662",
       "source": "met",
       "url": "https://www.metmuseum.org/art/collection/search/318662",
       "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/318662",
-      "title": "Vessel with throne scene"
+      "title": "Vessel with throne scene",
+      "note": "Met images can't be fetched by script (bot protection); browser hotlinking works."
     },
     {
       "id": "met-319633",
       "source": "met",
       "url": "https://www.metmuseum.org/art/collection/search/319633",
       "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/319633",
-      "title": "Cylindrical Vessel"
+      "title": "Cylindrical Vessel",
+      "note": "Met images can't be fetched by script (bot protection); browser hotlinking works."
     },
     {
       "id": "met-314311",
       "source": "met",
       "url": "https://www.metmuseum.org/art/collection/search/314311",
       "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/314311",
-      "title": "Cylindrical Vessel"
+      "title": "Cylindrical Vessel",
+      "note": "Met images can't be fetched by script (bot protection); browser hotlinking works."
     },
     {
       "id": "met-662967",
       "source": "met",
       "url": "https://www.metmuseum.org/art/collection/search/662967",
       "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/662967",
-      "title": "Vessel with mythological scene"
+      "title": "Vessel with mythological scene",
+      "note": "Met images can't be fetched by script (bot protection); browser hotlinking works."
     },
     {
       "id": "met-314217",
       "source": "met",
       "url": "https://www.metmuseum.org/art/collection/search/314217",
       "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/314217",
-      "title": "Vessel with mythological scene"
+      "title": "Vessel with mythological scene",
+      "note": "Met images can't be fetched by script (bot protection); browser hotlinking works."
     },
     {
       "id": "met-313315",
       "source": "met",
       "url": "https://www.metmuseum.org/art/collection/search/313315",
       "api": "https://collectionapi.metmuseum.org/public/collection/v1/objects/313315",
-      "title": "Vessel with Deity Figures"
+      "title": "Vessel with Deity Figures",
+      "note": "Met images can't be fetched by script (bot protection); browser hotlinking works."
     },
     {
       "id": "lacma-168523",

@@ -1,0 +1,23 @@
+{
+  "id": "met-319633",
+  "source_url": "https://www.metmuseum.org/art/collection/search/319633",
+  "title": "Cylindrical Vessel",
+  "objectDate": "6th\u20139th century",
+  "dimensions": "H. 7 7/8 x Diam. 6 1/4 in. (18.1 x 15.9 cm)",
+  "isPublicDomain": true,
+  "note": "Met image server blocks scripted downloads; files not stored locally. Save them by hand into photos/ (move any rollout photo to rollout/) if needed for eval.",
+  "images": [
+    {
+      "file": "photos/01.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-13003-003.jpg"
+    },
+    {
+      "file": "photos/02.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-13003-004.jpg"
+    },
+    {
+      "file": "photos/03.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-13003-008.jpg"
+    }
+  ]
+}

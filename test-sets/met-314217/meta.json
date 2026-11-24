@@ -1,0 +1,55 @@
+{
+  "id": "met-314217",
+  "source_url": "https://www.metmuseum.org/art/collection/search/314217",
+  "title": "Vessel with mythological scene",
+  "objectDate": "600\u2013800 CE",
+  "dimensions": "H. 4 1/2 \u00d7 W. 4 15/16 \u00d7 D. 4 15/16 in. (11.4 \u00d7 12.5 \u00d7 12.5 cm)",
+  "isPublicDomain": true,
+  "note": "Met image server blocks scripted downloads; files not stored locally. Save them by hand into photos/ (move any rollout photo to rollout/) if needed for eval.",
+  "images": [
+    {
+      "file": "photos/01.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-571-001.jpg"
+    },
+    {
+      "file": "photos/02.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-577-001.jpg"
+    },
+    {
+      "file": "photos/03.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-571-005.jpg"
+    },
+    {
+      "file": "photos/04.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-571-003.jpg"
+    },
+    {
+      "file": "photos/05.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-571-004.jpg"
+    },
+    {
+      "file": "photos/06.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-571-002.jpg"
+    },
+    {
+      "file": "photos/07.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/vs1980_213c.jpg"
+    },
+    {
+      "file": "photos/08.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/vs1980_213.jpg"
+    },
+    {
+      "file": "photos/09.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/vs1980_213a.jpg"
+    },
+    {
+      "file": "photos/10.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/vs1980_213b.jpg"
+    },
+    {
+      "file": "photos/11.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/vs1980_213d.jpg"
+    }
+  ]
+}
