@@ -23,6 +23,7 @@ var PIPELINES = {
   "A2 two-class": function (cv) { return RIM2.detect(cv); },
   "A2 original fit": function (cv) { return RIM2.detect(cv, { refineRims: false, trimShadows: false }); },
   "A2 before base fix": function (cv) { return RIM2.detect(cv, { trimShadows: false }); },
+  "A2 before curve recovery": function (cv) { return RIM2.detect(cv, { recoverBaseCurve: false }); },
   // A2 + Snap
   "A+snap": function (cv) {
     var b = RIM2.detect(cv), im = { cv: cv, b: b };

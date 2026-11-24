@@ -45,25 +45,49 @@ function small(u) { return u.replace("/original/", "/web-large/"); }
 function cur() { return photos[idx]; }
 function lab() { var k = cur().key; return labels[k] || (labels[k] = { top: [], bot: [] }); }
 async function loadSets() {
+  try {
+    var committed = await (await fetch("../test-sets/labels.json")).json();
+    labels = Object.assign({}, committed, labels); // preserve work saved in this browser
+  } catch (e) {}
+  var query = new URLSearchParams(location.search);
+  var selected = (query.get("sets") || "").split(",").filter(Boolean);
+  var unlabelled = query.get("unlabelled") === "1";
   var m = await (await fetch("../test-sets/manifest.json")).json();
   for (var s of m.sets) {
-    // museum sources hotlink fine at web size; Sotheby's originals are ~100 MB PNGs
-    if (["met", "lacma", "precolumbianart4sale"].indexOf(s.source) < 0) continue;
+    if (selected.length && selected.indexOf(s.id) < 0) continue;
+    // Prefer local fixtures. Museum URLs provide a fallback for photos not downloaded yet.
+    if (["met", "lacma", "precolumbianart4sale", "sothebys", "christies"].indexOf(s.source) < 0) continue;
     try {
       var meta = await (await fetch("../test-sets/" + s.id + "/meta.json")).json();
       var ph = (meta.images || []).filter(function (i) { return i.file.indexOf("photos/") === 0; });
-      if (ph.length) sets.push({ id: s.id, title: meta.title || s.title || s.id, photos: ph.map(function (i) { return { key: s.id + "/" + i.file, url: small(i.url) }; }) });
+      if (unlabelled) ph = ph.filter(function (i) {
+        var L = labels[s.id + "/" + i.file];
+        return !L || (!L.unusable && !(L.top && L.top.length === 3 && L.bot && L.bot.length === 3));
+      });
+      if (ph.length) sets.push({ id: s.id, title: meta.title || s.title || s.id, photos: ph.map(function (i) {
+        return { key: s.id + "/" + i.file, local: "../test-sets/" + s.id + "/" + i.file, url: small(i.url) };
+      }) });
     } catch (e) {}
   }
   var sel = document.getElementById("set");
   sets.forEach(function (s, i) { var o = document.createElement("option"); o.value = i; o.textContent = s.id + " (" + s.photos.length + ")"; sel.appendChild(o); });
   sel.onchange = function () { photos = sets[sel.value].photos; idx = 0; show(); };
+  if (!sets.length) {
+    document.getElementById("status").textContent = "No unlabelled photos in this queue.";
+    ["prev", "next", "clear", "skip", "tTop", "tBot"].forEach(function (id) { document.getElementById(id).disabled = true; });
+    updCount(); return;
+  }
   photos = sets[0].photos; show(); updCount();
 }
 function show() {
   document.getElementById("pos").textContent = (idx + 1) + " / " + photos.length;
   img.onload = function () { cv.width = img.naturalWidth; cv.height = img.naturalHeight; draw(); };
-  img.src = cur().url;
+  var photo = cur(), fallback = false;
+  img.onerror = function () {
+    if (!fallback) { fallback = true; img.src = photo.url; }
+    else document.getElementById("status").textContent = "Could not load this photo.";
+  };
+  img.src = photo.local;
 }
 function halfEllipse(p) { // p: [end, end, mid] in px -> points along the front arc
   if (p[0][0] > p[1][0]) p = [p[1], p[0], p[2]];
@@ -88,6 +112,7 @@ function draw() {
 }
 function evPt(e) { var b = cv.getBoundingClientRect(); return [(e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height]; }
 cv.addEventListener("pointerdown", function (e) {
+  if (!cur()) return;
   var p = evPt(e), L = lab(); L.unusable = false;
   // drag an existing point if close
   for (var k of ["top", "bot"]) for (var i = 0; i < L[k].length; i++) {
