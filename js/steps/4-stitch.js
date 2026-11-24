@@ -160,6 +160,7 @@ function setStepState(idx, state) {
    overlapping detail, and blend on the cylinder (js/core/camera.js, js/core/registration.js).
    Returns a canvas, or null when the photos can't be lined up reliably (caller falls back to the
    server). Uses each photo's crop from the Adjust step and the feather setting. */
+var STITCH_MIN_NCC = -1; // quality-gate threshold on the worst overlap agreement (calibrated below)
 function localStitch() {
   // Experimental: off by default until real-photo registration is reliable. Enable with ?local=1.
   if (!/[?&]local=1\b/.test(location.search)) return null;
@@ -171,6 +172,12 @@ function localStitch() {
   var strips = imgs.map(function (im, i) {
     return ROLLCAMERA.flatten(im.cv, reg.cameras[i], hGeom(im.b).r, { bounds: im.b, rectify: true });
   });
+  var t1 = performance.now(), q = ROLLREGISTER.refine(inputs, reg, strips);
+  logMsg("Fine alignment + quality: min overlap agreement " + (q.minNCC == null ? "n/a" : q.minNCC.toFixed(2)) +
+    ", mean " + (q.meanNCC == null ? "n/a" : q.meanNCC.toFixed(2)) + " (" + Math.round(performance.now() - t1) + " ms)");
+  window.lastStitchQuality = q; // for testing
+  // Quality gate: an overlap whose detail disagrees means ghosting; don't show it, use the server.
+  if (q.minNCC == null || q.minNCC < STITCH_MIN_NCC) { logMsg(t("qualityLow")); return null; }
   var out = ROLLREGISTER.compose(inputs, reg, strips, { feather: feather / 100 });
   if (!out) return null;
   if (out.span < 2 * Math.PI - 0.01) logMsg(t("coverageGap") + " (" + Math.round((out.span * 180) / Math.PI) + "\u00B0)");

@@ -267,6 +267,67 @@ var ROLLREGISTER = (function () {
     return { connected: best.graph.connected, cameras: best.choices.map(function (c, i) { return options[i][c].model; }),
       rotations: best.graph.rotations, confidence: confidence, pairs: pairs, method: method };
   }
+  // Valid angle range (radians, strip-local) of each photo: its Adjust-step crop and what its camera sees.
+  function limitsOf(images, registration) {
+    return images.map(function (image, i) {
+      var lo = Math.PI * ((image.cropL == null ? 0.14 : image.cropL) - 0.5), hi = Math.PI * ((image.cropR == null ? 0.86 : image.cropR) - 0.5), camera = registration.cameras[i];
+      if (camera) { var visible = Math.acos(1 / camera.distance) - 0.005; lo = Math.max(lo, -visible); hi = Math.min(hi, visible); }
+      return { lo: lo, hi: hi };
+    });
+  }
+  /* Detail map for fine alignment and the quality gate: the matcher's own descriptor (0.5 deg per
+     column, slow shading removed). Finer maps were tried; perspective stretch between two views of
+     the same overlap made fine detail disagree even at the correct offset. */
+  function detailMap(cv) { return { W: COLS, H: ROWS, v: describe(cv) }; }
+  // NCC of two strips' overlap in cylinder angle, at rotations ri and rj. Returns {ncc, cells}.
+  function overlapNCC(A, B, ri, rj, li, lj) {
+    var lo = Math.max(ri + li.lo, rj + lj.lo), hi = Math.min(ri + li.hi, rj + lj.hi);
+    // also try the overlap across the +-pi seam
+    if (hi - lo < 0.05) { var rj2 = rj + (rj < ri ? TAU : -TAU); lo = Math.max(ri + li.lo, rj2 + lj.lo); hi = Math.min(ri + li.hi, rj2 + lj.hi); rj = rj2; }
+    if (hi - lo < 0.05) return { ncc: null, cells: 0 };
+    var sab = 0, saa = 0, sbb = 0, sa = 0, sb = 0, n = 0, step = Math.PI / (A.W - 1);
+    for (var t = lo + step / 2; t < hi; t += step) {
+      var xa = Math.round(((t - ri) / Math.PI + 0.5) * (A.W - 1)), xb = Math.round(((t - rj) / Math.PI + 0.5) * (B.W - 1));
+      if (xa < 0 || xb < 0 || xa >= A.W || xb >= B.W) continue;
+      for (var y = 4; y < A.H - 4; y++) {
+        var a = A.v[y * A.W + xa], b = B.v[y * B.W + xb]; if (a !== a || b !== b) continue;
+        sab += a * b; saa += a * a; sbb += b * b; sa += a; sb += b; n++;
+      }
+    }
+    if (n < 100) return { ncc: null, cells: n };
+    var cov = sab / n - (sa / n) * (sb / n), va = saa / n - (sa / n) * (sa / n), vb = sbb / n - (sb / n) * (sb / n);
+    return { ncc: va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : null, cells: n };
+  }
+  /* Fine alignment: nudge each photo's rotation (up to +-3 degrees) to maximise agreement of its
+     overlaps with all other photos, by coordinate descent (coarse 0.25 deg, then 0.05 deg). Photo 0
+     stays the origin. Then the quality gate: report the agreement of every overlapping pair; a poor
+     minimum means ghosting. Mutates registration.rotations; returns {pairs, minNCC, meanNCC}. */
+  function refine(images, registration, strips) {
+    var maps = strips.map(detailMap), lim = limitsOf(images, registration), N = images.length, rot = registration.rotations;
+    function total(i, r) {
+      var s = 0, w = 0;
+      for (var j = 0; j < N; j++) if (j !== i) { var o = overlapNCC(maps[i], maps[j], r, rot[j], lim[i], lim[j]); if (o.ncc !== null) { s += o.ncc * o.cells; w += o.cells; } }
+      return w ? s / w : null;
+    }
+    var D = Math.PI / 180;
+    for (var pass = 0; pass < 3; pass++) for (var i = 1; i < N; i++) {
+      var base = rot[i], best = total(i, base), bestR = base;
+      if (best === null) continue;
+      for (var d = -3; d <= 3.0001; d += 0.25) { var v = total(i, base + d * D); if (v !== null && v > best) { best = v; bestR = base + d * D; } }
+      var c = bestR;
+      for (var e = -0.25; e <= 0.2501; e += 0.05) { var v2 = total(i, c + e * D); if (v2 !== null && v2 > best) { best = v2; bestR = c + e * D; } }
+      rot[i] = wrap(bestR);
+    }
+    var pairs = [];
+    for (var a = 0; a < N; a++) for (var b = a + 1; b < N; b++) {
+      var o = overlapNCC(maps[a], maps[b], rot[a], rot[b], lim[a], lim[b]);
+      if (o.ncc !== null) pairs.push({ i: a, j: b, ncc: o.ncc, cells: o.cells });
+    }
+    // The gate ignores sliver overlaps (under ~15 degrees), which are mostly oblique edge pixels.
+    var minCells = 30 * (ROWS - 8) * 0.5, nccs = pairs.filter(function (p) { return p.cells >= minCells; }).map(function (p) { return p.ncc; });
+    return { pairs: pairs, minNCC: nccs.length ? Math.min.apply(null, nccs) : null,
+      meanNCC: nccs.length ? nccs.reduce(function (x, y) { return x + y; }, 0) / nccs.length : null };
+  }
   function compose(images, registration, strips, opts) {
     opts = opts || {};
     if (!registration.connected || strips.length !== images.length) return null;
@@ -320,5 +381,5 @@ var ROLLREGISTER = (function () {
     ctx.putImageData(result, 0, 0);
     return { canvas: output, coveragePct: 100 * count / (W * H), start: start, span: span };
   }
-  return { estimate: estimate, compose: compose, wrap: wrap };
+  return { estimate: estimate, compose: compose, refine: refine, wrap: wrap, _dbg: { detailMap: detailMap, overlapNCC: overlapNCC, limitsOf: limitsOf } };
 })();
