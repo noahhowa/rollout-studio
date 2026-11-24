@@ -63,7 +63,8 @@ function mkIO(p) {
 async function hfCall(paths, doCrop) {
   var data = [];
   for (var i = 0; i < 5; i++) data.push(i < paths.length ? mkIO(paths[i]) : null);
-  data.push(!!doCrop);
+  // The Space's process_images endpoint takes exactly five images. It used to take a sixth
+  // "smart crop" flag; sending it now makes Gradio fail with a bare "API: null" error.
   var resp = await fetch(HF + "/gradio_api/call/process_images", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
