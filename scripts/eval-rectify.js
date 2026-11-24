@@ -26,6 +26,7 @@ const stitched = JSON.parse(fs.readFileSync(path.join(ROOT, "test-sets/stitched.
   await page.route(/googletag|fonts\.g/, (r) => r.abort());
   await page.goto(`http://localhost:${port}/`);
   if (process.env.PROFILE) await page.evaluate(() => { window.PROFILE = true; });
+  if (process.env.PARAMS) await page.evaluate((p) => { Object.assign(AUTORECT.params, JSON.parse(p)); }, process.env.PARAMS);
   const rows = [];
   for (const [id, lab] of Object.entries(labels)) {
     const s = stitched.find((x) => x.id === id);
@@ -51,7 +52,8 @@ const stitched = JSON.parse(fs.readFileSync(path.join(ROOT, "test-sets/stitched.
           for (let x = pts[0].x; x <= pts[pts.length - 1].x; x += W / 400) ys.push(m.map(x, interpPolylineX(pts, x)));
           const mean = ys.reduce((a, b) => a + b, 0) / ys.length;
           const rms = Math.sqrt(ys.reduce((a, b) => a + (b - mean) * (b - mean), 0) / ys.length), max = Math.max(...ys.map((v) => Math.abs(v - mean)));
-          return { rmsPct: 100 * rms / bandH, maxPct: 100 * max / bandH };
+          const prof = []; for (let k = 0; k < 20; k++) { const seg = ys.slice(Math.floor(k * ys.length / 20), Math.floor((k + 1) * ys.length / 20)); prof.push(+(100 * (seg.reduce((a, b) => a + b, 0) / seg.length - mean) / bandH).toFixed(2)); }
+          return { rmsPct: 100 * rms / bandH, maxPct: 100 * max / bandH, x0: pts[0].x / W, x1: pts[pts.length - 1].x / W, profile: prof };
         });
       }
       const bandH = auto ? mapper(auto.top, auto.bot).span : H * 0.7;
