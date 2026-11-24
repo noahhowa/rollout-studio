@@ -107,6 +107,26 @@ Ten further LACMA labels bring the total to 52, with all existing coordinates pr
 
 Measured with the same Playwright Chromium comparison and procedural synthetic texture fallback. All pipelines completed successfully.
 
+### Bottom-rim regressions from supplied dark-backdrop photos
+
+Two supplied PNG screenshots are checked in under `test-sets/bottom-rim-regression/photos/`, with hand-labelled front base arcs. The evaluator includes each at 75%, 100% and 150% size through `meta.json`'s `evaluationScales`, since the first failure depends on resampling.
+
+- A dark painted band can truncate the initial mask halfway down the vessel. The refinement previously searched only 15% below that incomplete component. When the initial bottom fit is flat and ends well above the image border, refinement now searches the remaining rows and permits a longer gap to an aligned base fragment.
+- A floor patch can join the refined mask below an already rounded base. The detector now trims a sudden widening after the silhouette has tapered. If the patch has grown gradually, it retains the initial rounded base when refinement extends substantially lower and the initial base has comparable width.
+
+| case | bottom error before %H | bottom error after %H |
+|---|---:|---:|
+| Left photo, 75% size, mid-body cutoff | 42.47 | 0.53 |
+| Left photo, original size | 0.41 | 0.49 |
+| Left photo, 150% size | 0.46 | 0.55 |
+| Right photo, 75% size, floor leak | 12.49 | 0.30 |
+| Right photo, original size, floor leak | 12.18 | 0.34 |
+| Right photo, 150% size, floor leak | 13.66 | 0.28 |
+
+The six regression cases average 13.61 → 0.42%H bottom error. The 27 previously available labelled photos retain their exact rim scores (bottom mean 1.42%H). All nine synthetic scenes retain their exact rim scores (top 3.22%H, bottom 5.51%H). The combined 33 labelled cases score 3.63 → 1.24%H bottom error. Met collection photos remain unavailable for this run.
+
+Reproduce with `node scripts/eval.js --only "A2 before base fix,A2 two-class"`. Run `node scripts/check_bottom_rims.js` for assertions on both supplied photos at all three sizes and three repeated canvas reads, plus the normal Upload → Map Rims path. Each base curve and front midpoint must be within 2% of vessel height, and endpoint x error must be under 5% of rim width. The report is `eval/out/report.html`, and the upload preview is `eval/out/bottom-rim-fix.png`.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):
