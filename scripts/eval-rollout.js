@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-/* Multi-view rollout yardstick. Run after scripts/fetch_rollout_references.py. */
+/* Multi-view rollout yardstick. Run after scripts/fetch_rollout_references.py.
+   Quick mode for experiments: ROLLOUT_ONLY="procedural/close,met-310364/studio,real:pca4sale-446"
+   runs only those synthetic scenes / real comparisons (the full-run acceptance check is skipped). */
 const http = require("http"), fs = require("fs"), path = require("path");
 const { chromium } = require("playwright");
 const ROOT = path.resolve(__dirname, ".."), OUT = path.join(ROOT, "eval/out");
@@ -28,19 +30,29 @@ async function main() {
     await page.goto(`http://127.0.0.1:${server.address().port}/eval/rollout.html`);
     const result = { synthetic: [], published: [], missingReferences: [], config, check: null };
     const textures = [{ id: "procedural" }].concat(config.references);
+    const only = process.env.ROLLOUT_ONLY ? process.env.ROLLOUT_ONLY.split(",") : null;
+    const wanted = key => !only || only.includes(key);
     for (const texture of textures) {
       if (texture.file && !fs.existsSync(path.join(ROOT, texture.file))) { result.missingReferences.push(texture.id); continue; }
       await page.evaluate(async texture => { window.rolloutTexture = texture.file ? await ROLLOUT.loadReference(texture) : ROLLOUT.makeTexture(); }, texture);
       for (const scene of config.scenes) {
+        if (!wanted(`${texture.id}/${scene.id}`)) continue;
         const group = await page.evaluate(async job => ROLLOUT.synthetic(window.rolloutTexture, job.id, job.scene, job.rotations), { id: texture.id, scene, rotations: config.rotations });
         result.synthetic.push(group);
         console.log(group.rows[0].id, group.rows.map(row => `${row.pipeline} ${number(row.geometry.angleMAEDeg)}°`).join(" | "));
       }
-      if (texture.file) {
+      if (texture.file && wanted(`real:${texture.id}`)) {
         const folder = path.join(ROOT, "test-sets", texture.id, "photos");
         const sources = fs.existsSync(folder) ? fs.readdirSync(folder).filter(file => /\.jpe?g$/i.test(file)).sort().map(file => `/test-sets/${texture.id}/photos/${file}`) : [];
         result.published.push(await page.evaluate(async job => ROLLOUT.published(job.texture, window.rolloutTexture, job.sources), { texture, sources }));
       }
+    }
+    if (only) {
+      for (const g of result.synthetic) for (const r of g.rows) if (r.registration)
+        console.log(r.id, r.pipeline.split(" ")[0], "rot", r.rotationsDeg.map(a => Math.round(a)).join(","), "truth", config.rotations.join(","), "conn", r.registration.connected,
+          "pairs", (r.registration.pairs || []).filter(q => q.ok).map(q => `${q.i}-${q.j}:${Math.round(q.angleDeg)}/${q.correlation.toFixed(2)}/${q.margin.toFixed(2)}`).join(" "));
+      for (const p of result.published) console.log("real", p.id, JSON.stringify({ reference: p.texture && p.texture.angleMAEDeg, automatic: p.automatic && { connected: p.automatic.registration && p.automatic.registration.connected, texture: p.automatic.texture && p.automatic.texture.angleMAEDeg, matched: p.automatic.texture && p.automatic.texture.matchedColumnsPct, coverage: p.automatic.coveragePct } }));
+      console.log("Quick mode: acceptance check skipped"); return;
     }
     const oracles = result.synthetic.flatMap(group => group.rows.filter(row => row.pipeline === "known camera"));
     const controls = result.synthetic.find(group => group.controls).controls;

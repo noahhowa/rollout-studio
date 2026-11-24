@@ -70,43 +70,86 @@ var ROLLREGISTER = (function () {
     return { angle: (best.shift + delta) * Math.PI / (COLS - 1), correlation: best.score, dy: best.dy, margin: margin, ok: ok,
       weight: ok ? (best.score - 0.2 + margin) * Math.sqrt(best.count / 40) : 0 };
   }
-  function graph(choices, matches) {
-    var N = choices.length, rotations = new Array(N).fill(null), used = [0], edges = [], score = 0;
-    rotations[0] = 0;
+  function edgeOf(matches, choices, i, j) { return i < j ? matches[i][j][choices[i]][choices[j]] : matches[j][i][choices[j]][choices[i]]; }
+  // Greedy maximum spanning tree grown from one root photo; rotations relative to the root.
+  function tree(choices, matches, root) {
+    var N = choices.length, rotations = new Array(N).fill(null), used = [root], edges = [];
+    rotations[root] = 0;
     while (used.length < N) {
       var best = null;
       used.forEach(function (i) {
         for (var j = 0; j < N; j++) if (rotations[j] === null) {
-          var edge = i < j ? matches[i][j][choices[i]][choices[j]] : matches[j][i][choices[j]][choices[i]];
+          var edge = edgeOf(matches, choices, i, j);
           if (!best || edge.weight > best.edge.weight) best = { i: i, j: j, edge: edge, sign: i < j ? 1 : -1 };
         }
       });
       if (!best || !best.edge.ok) break;
       rotations[best.j] = wrap(rotations[best.i] + best.sign * best.edge.angle);
-      score += best.edge.weight; edges.push(best.edge); used.push(best.j);
+      edges.push(best.edge); used.push(best.j);
     }
-    if (used.length < N) return { score: -1000 + used.length, rotations: rotations, connected: false, edges: edges };
-    var links = [];
-    for (var i = 0; i < N; i++) for (var j = i + 1; j < N; j++) {
-      var edge = matches[i][j][choices[i]][choices[j]], residual = Math.abs(wrap(rotations[j] - rotations[i] - edge.angle));
-      if (edge.ok) {
-        score += edge.weight * Math.max(0, 1 - residual / 0.06);
-        if (residual < 0.08) links.push({ i: i, j: j, edge: edge });
+    return { rotations: rotations, edges: edges, connected: used.length === N, size: used.length };
+  }
+  /* Rotations from the pairwise matches. A single false match (repeated motifs) can mislead a tree
+     grown greedily from one photo, so trees are grown from every root and the solution is scored by
+     loop consistency: accepted pairs it agrees with count for it, accepted pairs it contradicts count
+     against it. Then consistent pairs refine the angles. Photo zero is the angular origin. */
+  function graph(choices, matches) {
+    var N = choices.length, bestT = null, bestScore = -Infinity;
+    for (var root = 0; root < N; root++) {
+      var t = tree(choices, matches, root);
+      if (!t.connected) { if (!bestT && -1000 + t.size > bestScore) { bestScore = -1000 + t.size; bestT = t; } continue; }
+      var sc = 0;
+      for (var i = 0; i < N; i++) for (var j = i + 1; j < N; j++) {
+        var edge = matches[i][j][choices[i]][choices[j]]; if (!edge.ok) continue;
+        var residual = Math.abs(wrap(t.rotations[j] - t.rotations[i] - edge.angle));
+        if (residual < 0.06) sc += edge.weight * (1 - residual / 0.06);
       }
+      if (sc > bestScore) { bestScore = sc; bestT = t; }
     }
-    // Refine the spanning-tree solution with consistent loop closures, anchored at photo zero.
+    if (!bestT.connected) return { score: bestScore, rotations: bestT.rotations, connected: false, edges: bestT.edges };
+    var r0 = bestT.rotations[0], rotations = bestT.rotations.map(function (r) { return wrap(r - r0); }), links = [];
+    for (var i2 = 0; i2 < N; i2++) for (var j2 = i2 + 1; j2 < N; j2++) {
+      var e = matches[i2][j2][choices[i2]][choices[j2]];
+      if (e.ok && Math.abs(wrap(rotations[j2] - rotations[i2] - e.angle)) < 0.08) links.push({ i: i2, j: j2, edge: e });
+    }
     for (var iteration = 0; iteration < 8; iteration++) {
-      for (var i = 1; i < N; i++) {
+      for (var k = 1; k < N; k++) {
         var correction = 0, total = 0;
         links.forEach(function (link) {
-          if (link.i !== i && link.j !== i) return;
+          if (link.i !== k && link.j !== k) return;
           var error = wrap(rotations[link.j] - rotations[link.i] - link.edge.angle);
-          correction += (link.i === i ? error : -error) * link.edge.weight; total += link.edge.weight;
+          correction += (link.i === k ? error : -error) * link.edge.weight; total += link.edge.weight;
         });
-        if (total) rotations[i] = wrap(rotations[i] + correction / total);
+        if (total) rotations[k] = wrap(rotations[k] + correction / total);
       }
     }
-    return { score: score, rotations: rotations, connected: true, edges: edges };
+    closeLoop(rotations, choices, matches);
+    return { score: bestScore, rotations: rotations, connected: true, edges: bestT.edges };
+  }
+  /* Loop closure: when the photos go all the way round and every neighbouring pair (in angle order,
+     including last -> first) has an accepted match, the measured steps must sum to 360 degrees.
+     Rescale the steps to do so; this removes the steady drift caused by a slightly wrong camera
+     distance (each step a little too long or short). Skipped if the loop is incomplete or the sum
+     is implausible (more than 15% off). */
+  function closeLoop(rotations, choices, matches) {
+    var N = rotations.length; if (N < 3) return;
+    var order = rotations.map(function (r, i) { return { i: i, r: ((r % TAU) + TAU) % TAU }; }).sort(function (a, b) { return a.r - b.r; });
+    var steps = [];
+    for (var k = 0; k < N; k++) {
+      var a = order[k].i, b = order[(k + 1) % N].i, e = edgeOf(matches, choices, a, b);
+      if (!e.ok) return;
+      var step = a < b ? e.angle : -e.angle; // measured angle from a to b
+      step = ((step % TAU) + TAU) % TAU;
+      if (step <= 0 || step > Math.PI) return;
+      steps.push(step);
+    }
+    var total = steps.reduce(function (x, y) { return x + y; }, 0), scale = TAU / total;
+    if (Math.abs(scale - 1) > 0.15) return;
+    var start = order[0].r, acc = 0, placed = new Array(N);
+    placed[order[0].i] = start;
+    for (var m = 1; m < N; m++) { acc += steps[m - 1] * scale; placed[order[m].i] = start + acc; }
+    var shift = placed[0];
+    for (var q = 0; q < N; q++) rotations[q] = wrap(placed[q] - shift);
   }
   function estimate(images) {
     if (images.length < 2) return { connected: false, cameras: images.map(function () { return null; }), rotations: [0], confidence: 0 };
