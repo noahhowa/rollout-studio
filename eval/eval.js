@@ -126,6 +126,20 @@ function runPipelines(cv, truth, extra) {
   }
   return out;
 }
+// Hand label (3 normalised clicks per rim: left end, right end, front middle) -> truth curves in px.
+function labelTruth(L, W, H) {
+  function arc(p) {
+    var xl = p[0][0] * W, yl = p[0][1] * H, xr = p[1][0] * W, yr = p[1][1] * H, xc = (xl + xr) / 2, a = (xr - xl) / 2, yc = (yl + yr) / 2, b = p[2][1] * H - yc, out = [];
+    for (var i = 0; i <= 60; i++) { var u = -1 + (2 * i) / 60; out.push({ x: xc + u * a, y: yc + b * Math.sqrt(Math.max(0, 1 - u * u)) }); }
+    return out;
+  }
+  return { top: arc(L.top), bot: arc(L.bot) };
+}
+// Left/right rim end error, % of rim width (drives the angle mapping of the unwarp).
+function sideError(b, truth) {
+  function one(h, pts) { var w = pts[pts.length - 1].x - pts[0].x; return (50 * (Math.abs(h[0].x - pts[0].x) + Math.abs(h[2].x - pts[pts.length - 1].x))) / w; }
+  return { top: one(b.topH, truth.top), bot: one(b.botH, truth.bot) };
+}
 window.runEval = async function (job) {
   var cases = []; ONLY = job.only || null;
   var met = null;
@@ -141,8 +155,12 @@ window.runEval = async function (job) {
     cases.push({ group: "synthetic", id: p.id, params: p, visHalfDeg: s.truth.visHalfDeg, overlay: toJpeg(overlay(s.canvas, res, s.truth), 420), results: res.map(strip0) });
   }
   for (var k = 0; k < job.real.length; k++) {
-    var rc = job.real[k], cv = await loadCanvas(rc.src), rr = runPipelines(cv, null);
-    cases.push({ group: rc.set, id: rc.file, overlay: toJpeg(overlay(cv, rr, null), 420), results: rr.map(strip0) });
+    var rc = job.real[k], cv = await loadCanvas(rc.src), rr = runPipelines(cv, null), lt = null;
+    if (rc.label && !rc.label.unusable) {
+      lt = labelTruth(rc.label, cv.width, cv.height);
+      rr.forEach(function (r) { if (r.b) { r.rim = rimError(r.b, lt); r.side = sideError(r.b, lt); } });
+    }
+    cases.push({ group: rc.set, id: rc.file, labelled: !!lt, overlay: toJpeg(overlay(cv, rr, lt), 420), results: rr.map(strip0) });
   }
   return cases;
   function strip0(r) { var o = Object.assign({}, r); delete o.b; return o; }
