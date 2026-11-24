@@ -181,6 +181,20 @@ A background photo search prepared ten unlabelled photos across five additional 
 
 The labeller now prefers downloaded photos, seeds committed labels while preserving browser-saved edits, accepts `?sets=id,id&unlabelled=1`, and supports Sotheby's and Christie's sources. The ten-photo queue uses those five `edge-*` IDs. Its images and persistence were checked in isolated Playwright Chromium. These photos have not influenced detector tuning or the reported scores.
 
+### Independent edge-case ground truth
+
+The next export labels all ten queued `edge-*` photos across five vessels, without changing any prior coordinates. There are now 75 labels, with 50 source photos available and 54 scored cases including the PNG size variants. The same 25 Met photos remain unavailable. No detector tuning was performed on this batch.
+
+| detector / sample | top %H | bottom %H | top ends %W | bottom ends %W |
+|---|---:|---:|---:|---:|
+| Before curve recovery, all 54 cases | 1.461 | 2.149 | 4.018 | 4.074 |
+| Current default, all 54 cases | 1.461 | 1.932 | 4.018 | 4.074 |
+| Current default, ten new cases only | 1.710 | 2.157 | 14.184 | 10.552 |
+
+The earlier recovery still reduces aggregate bottom error by 10.1%. On the ten independent cases, nine results are unchanged, while `edge-sothebys-2023-bird-vessel/01.jpg` changes from 0.2545 to 0.2556%H bottom error. Synthetic scores remain 3.225/5.511%H top/bottom and all pipelines complete without errors. Reproduce with `node scripts/eval.js --only "A2 before curve recovery,A2 two-class"`.
+
+The new labels expose much larger endpoint errors than curve-position errors. The stone-floor vessel has 26.66–41.92%W top endpoint error, and the 2024 polychrome vessel has 24.89–26.16%W bottom endpoint error. These are priority cases for checking mask extent and fitted rim width in the overlays. The bird vessel has 6.22 and 5.89%H top errors; its labelled front middle sits above the endpoints, which conflicts with the detector's fixed camera-above assumption. The stone-floor fourth view has the largest new bottom curve error, 6.29%H. These observations identify the next experiments; they do not establish a fix.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):
