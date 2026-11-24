@@ -1,5 +1,34 @@
 # Automatic camera and rotation estimation handoff
 
+## Update (Claude takeover)
+
+Changes in `js/core/registration.js`:
+- **Matching:** shading-removed block normalised cross-correlation over the whole overlap, with a ±3-row vertical search, replaces per-column correlation. A match is accepted when its peak beats every shift more than ~8° away by a margin (`ok`), instead of a fixed 0.65 cut-off.
+- **Solve:** spanning trees grown from every photo, scored by the pair matches they agree with (a contradiction penalty was tried and rejected: it biased camera choice towards hypotheses with fewer accepted pairs).
+- **Loop closure (`closeLoop`):** when neighbouring photos connect all the way round, the steps are rescaled to sum to 360°.
+- `estimate()` also returns `pairs` (best match per photo pair) for debugging.
+- Yardstick quick mode: `ROLLOUT_ONLY="procedural/close,real:pca4sale-446" node scripts/eval-rollout.js` (~30 s per scene).
+
+Detected rims + estimated cameras and rotations, geometric angle MAE (°):
+
+| scene | procedural | Met | pca4sale |
+|---|---|---|---|
+| close | 0.192 → **0.109** | 1.359 → **0.275** | 6.236 → **1.032** |
+| studio | 0.176 → 0.326 | 1.285 → **0.323** | 0.281 → **0.212** |
+| far | 0.129 → 0.667 | 0.168 → 0.170 | 0.194 → 0.231 |
+| reframed | 0.185 → 0.201 | 0.302 → 0.298 | 0.834 → **0.212** |
+
+Mean over 12 sets: **0.945° → 0.338°**; worst **6.24° → 1.03°**. True-rim diagnostic: Met close 55.0 → 13.6°, pca close 36.3 → 1.5°; procedural close still fails (84.9°, the generated texture's repeating motifs give false matches).
+
+Real pca4sale (photo-only, no reference): previously disconnected; now **5/5 connected in ~2.4 s**, image-based angle MAE 5.98° on 51% matched columns (reference-registered baseline: 5.14° on 61%), 96% coverage.
+
+Open items:
+- procedural/far regressed 0.13 → 0.67°: rotations are within 1°, so it's the camera-hypothesis choice; check how match weights rank hypotheses.
+- True-rim procedural close (repeating texture) and the true-handle centre bias (below) remain.
+- App integration (next steps 3–4 below) not started.
+
+## Original Codex handoff
+
 This is a draft implementation checkpoint. The user asked for an automatic photos-to-rollout pipeline, measured with the whole-rollout yardstick, and then asked to prioritize a PR that Claude can take over.
 
 ## Current state
