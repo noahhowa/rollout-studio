@@ -53,7 +53,9 @@
     2000,
     1898
    ],
-   "source": "Hugging Face Space (upload order)"
+   "source": "Hugging Face Space (upload order)",
+   "failed": true,
+   "note": "Hugging Face stitch failed (pieces overlap at 30-45 degrees); not labelled. Auto-rectify should decline it."
   },
   {
    "id": "lacma-168596",

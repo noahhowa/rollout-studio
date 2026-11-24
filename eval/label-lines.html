@@ -41,7 +41,7 @@ var COLORS = ["#f97316", "#2563eb", "#16a34a", "#db2777", "#7c3aed"];
 function lab() { return labels[cur] || (labels[cur] = { lines: [[]] }); }
 async function load() {
   var list = await (await fetch("../test-sets/stitched.json")).json();
-  sets = list.sets;
+  sets = list.sets.filter(function (s) { return !s.failed; }); // failed stitches can't be labelled
   var sel = document.getElementById("set");
   sets.forEach(function (s) { var o = document.createElement("option"); o.value = s.id; o.textContent = s.id; sel.appendChild(o); });
   sel.onchange = function () { show(sel.value); };
