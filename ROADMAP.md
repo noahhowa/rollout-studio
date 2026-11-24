@@ -195,6 +195,21 @@ The earlier recovery still reduces aggregate bottom error by 10.1%. On the ten i
 
 The new labels expose much larger endpoint errors than curve-position errors. The stone-floor vessel has 26.66–41.92%W top endpoint error, and the 2024 polychrome vessel has 24.89–26.16%W bottom endpoint error. These are priority cases for checking mask extent and fitted rim width in the overlays. The bird vessel has 6.22 and 5.89%H top errors; its labelled front middle sits above the endpoints, which conflicts with the detector's fixed camera-above assumption. The stone-floor fourth view has the largest new bottom curve error, 6.29%H. These observations identify the next experiments; they do not establish a fix.
 
+### Tilted shallow lip and Map reset regression
+
+A further supplied PNG (`top-rim-regression/photos/01.png`, 852 × 1142) exposes a top line above the lip. The visible lip slopes downward to the right. A fresh upload reproduces the high line, but the extra-wide ends shown in the user's app screenshot were not reproduced with this source at the tested resolutions. The Map reset button also still used `initH`, the old red-pixel heuristic. Reset now reruns `RIM2.detect` and updates the existing bounds object so rendering and preview callbacks see the new result. It retains the old fallback if detection fails.
+
+For nearly flat top fits only, a local full-resolution gradient search can now fit a tilted line. It keeps the existing width and accepts only a small, coherent slope supported by at least 20 of 25 columns, with bounded displacement and residual. The handle representation preserves that slope. Curved rims retain the existing ellipse path. This is an approximation for nearly edge-on tilted lips, not a general rotated-ellipse model.
+
+| detector, 54 labelled cases | top %H | bottom %H | top ends %W | bottom ends %W | synthetic top %H | synthetic bottom %H |
+|---|---:|---:|---:|---:|---:|---:|
+| Before tilted-lip refinement | 1.461 | 1.932 | 4.018 | 4.074 | 3.225 | 5.511 |
+| Current default | 1.442 | 1.932 | 4.018 | 4.074 | 3.225 | 5.511 |
+
+Two labelled top scores improve: `lacma-168564/04.jpg`, 5.777 → 5.060%H, and `edge-sothebys-2023-bird-vessel/02.jpg`, 5.893 → 5.622%H. The other 52 labelled cases, all bottom/endpoint scores and nine synthetic scores are unchanged. These are modest aggregate gains and leave the large endpoint outliers unresolved. No pipeline errors occurred. Reproduce with `node scripts/eval.js --only "A2 before tilted lip,A2 two-class"`.
+
+On the new supplied PNG, the detected top middle moves from y=132.06 to y=148.83, following the visible red lip. This fixture has no user hand labels and is excluded from the aggregate label scores. `node scripts/check_top_rim.js` separately asserts broad corridors around the visible endpoints at 75%, 100% and 150% scale, repeated reads, a normal upload, and recovery from deliberately corrupted handles through Reset rims. The test passes, as does `node scripts/check_bottom_rims.js --include-real`. The corrected Map preview is written to `eval/out/top-rim-fix.png`. General tilted-cylinder camera geometry and the whole-rollout benchmark were not changed or rerun in this pass.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):

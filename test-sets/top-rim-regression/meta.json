@@ -1,0 +1,8 @@
+{
+  "id": "top-rim-regression",
+  "title": "Tilted shallow lip on a gray backdrop",
+  "source": "User-supplied screenshot, 2026-11-24",
+  "images": [{ "file": "photos/01.png", "size": [852, 1142] }],
+  "evaluationScales": [0.75, 1, 1.5],
+  "note": "Fresh uploads place the nearly flat top above the tilted red lip. Separate regression assertions use visible edge positions; no user ground-truth rim labels have been assigned to this fixture."
+}
