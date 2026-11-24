@@ -39,6 +39,15 @@ On real photos the red-pixel rim scan often fails outright (e.g. the Met set, wh
 
 ## Phase 2: automatic rim recognition
 
+### Real-photo scores (hand labels, `test-sets/labels.json`, 21 scored photos in 9 sets)
+
+| detector | top rim %H | bottom rim %H | rim ends, top % | rim ends, bottom % |
+|---|---|---|---|---|
+| original | 4.6 | 5.6 | 25 | 30 |
+| A2 + "camera above" (current) | **1.1** | **1.2** | **2.3** | **1.6** |
+
+The perspective-based camera above/below guess was removed: on real photos it scored 3.9% top vs 1.1% for always assuming "above". Label more photos at `eval/label.html` (Met sets need their photos saved by hand to be scored).
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):
