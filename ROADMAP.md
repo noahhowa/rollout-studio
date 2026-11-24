@@ -92,6 +92,17 @@ The same comparison on the expanded labels, using Playwright Chromium and the pr
 
 The expanded set exposes two larger outliers: `lacma-168977/03.jpg` has 2.34%H top error and `lacma-168399/03.jpg` has 9.74%W bottom endpoint error. The largest bottom curve error remains `pca4sale-446/02.jpg` at 3.81%H.
 
+### Second additional label export
+
+Ten further LACMA labels bring the total to 52, with all existing coordinates preserved. All ten photos downloaded, giving 27 available labelled photos across 12 sets. The 25 labelled Met photos remain unavailable.
+
+| detector | real top %H | real bottom %H | real top ends %W | real bottom ends %W | synthetic top %H | synthetic bottom %H |
+|---|---:|---:|---:|---:|---:|---:|
+| A2 original fit | 1.13 | 1.42 | 1.79 | 1.87 | 3.23 | 5.51 |
+| A2 two-class (new default) | 0.92 | 1.42 | 1.12 | 1.87 | 3.22 | 5.51 |
+
+Measured with the same Playwright Chromium comparison and procedural synthetic texture fallback. All pipelines completed successfully.
+
 ### Done: silhouette + ellipse detector (`js/core/rim-detect-v2.js`), now the app default
 
 Approaches tried (9 synthetic scenes, mean rim error as % of vessel height; real photos checked by eye):
