@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rim Labeller</title>
+<style>
+:root{--bg:#fafafa;--fg:#111;--mut:#666;--card:#fff;--bd:#e5e5e5;--top:#f97316;--bot:#2563eb;--ok:#16a34a}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--fg:#eee;--mut:#999;--card:#1e1e1e;--bd:#333}}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px system-ui,sans-serif;margin:0;padding:12px 16px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+button,select{font:inherit;padding:6px 10px;border-radius:6px;border:1px solid var(--bd);background:var(--card);color:var(--fg);cursor:pointer}
+button.on{outline:2px solid currentColor}
+#tTop{color:var(--top)}#tBot{color:var(--bot)}
+.hint{color:var(--mut);font-size:13px;margin:4px 0 8px}
+.wrap{position:relative;max-width:100%;display:inline-block}
+canvas{max-width:100%;max-height:78vh;display:block;cursor:crosshair;touch-action:none;border-radius:4px;background:#000}
+.done{color:var(--ok);font-weight:600}
+.progress{color:var(--mut)}
+textarea{width:100%;height:80px;font:12px monospace;margin-top:8px;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:6px}
+</style>
+</head>
+<body>
+<div class="bar">
+  <select id="set"></select>
+  <button id="prev">&larr;</button><span id="pos" class="progress"></span><button id="next">&rarr;</button>
+  <button id="tTop" class="on">Top rim</button><button id="tBot">Bottom rim</button>
+  <button id="clear">Clear photo</button><button id="skip">Mark unusable</button>
+  <span id="status"></span>
+  <span class="progress" id="count"></span>
+  <button id="copy">Copy labels</button>
+</div>
+<div class="hint">For each rim click 3 points: <b>left end</b>, <b>right end</b>, then the <b>middle of the front edge</b> (the edge nearest you: for the top rim, the front lip; for the bottom, where the base meets the surface). Drag a point to adjust. Labels are saved in this browser; use <b>Copy labels</b> and paste them into the chat.</div>
+<div class="wrap"><canvas id="cv"></canvas></div>
+<textarea id="out" readonly placeholder="Copied labels appear here too"></textarea>
+<script>
+"use strict";
+// Labels: {"<set>/<file>": {top:[[x,y]x3], bot:[[x,y]x3], unusable:bool}} with x,y normalised to 0..1.
+var KEY = "rollout-rim-labels-v1", labels = {};
+try { labels = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(labels)); } catch (e) {} updCount(); }
+var sets = [], photos = [], idx = 0, rim = "top", img = new Image(), cv = document.getElementById("cv"), ctx = cv.getContext("2d"), drag = null;
+function small(u) { return u.replace("/original/", "/web-large/"); }
+function cur() { return photos[idx]; }
+function lab() { var k = cur().key; return labels[k] || (labels[k] = { top: [], bot: [] }); }
+async function loadSets() {
+  var m = await (await fetch("../test-sets/manifest.json")).json();
+  for (var s of m.sets) {
+    // museum sources hotlink fine at web size; Sotheby's originals are ~100 MB PNGs
+    if (["met", "lacma", "precolumbianart4sale"].indexOf(s.source) < 0) continue;
+    try {
+      var meta = await (await fetch("../test-sets/" + s.id + "/meta.json")).json();
+      var ph = (meta.images || []).filter(function (i) { return i.file.indexOf("photos/") === 0; });
+      if (ph.length) sets.push({ id: s.id, title: meta.title || s.title || s.id, photos: ph.map(function (i) { return { key: s.id + "/" + i.file, url: small(i.url) }; }) });
+    } catch (e) {}
+  }
+  var sel = document.getElementById("set");
+  sets.forEach(function (s, i) { var o = document.createElement("option"); o.value = i; o.textContent = s.id + " (" + s.photos.length + ")"; sel.appendChild(o); });
+  sel.onchange = function () { photos = sets[sel.value].photos; idx = 0; show(); };
+  photos = sets[0].photos; show(); updCount();
+}
+function show() {
+  document.getElementById("pos").textContent = (idx + 1) + " / " + photos.length;
+  img.onload = function () { cv.width = img.naturalWidth; cv.height = img.naturalHeight; draw(); };
+  img.src = cur().url;
+}
+function halfEllipse(p) { // p: [left, right, mid] in px -> points along the front arc
+  var xl = p[0][0], yl = p[0][1], xr = p[1][0], yr = p[1][1], xc = (xl + xr) / 2, a = (xr - xl) / 2, yc = (yl + yr) / 2, b = p[2][1] - yc, out = [];
+  for (var i = 0; i <= 60; i++) { var u = -1 + (2 * i) / 60; out.push([xc + u * a, yc + b * Math.sqrt(Math.max(0, 1 - u * u))]); }
+  return out;
+}
+function draw() {
+  ctx.drawImage(img, 0, 0);
+  var L = labels[cur().key], W = cv.width, H = cv.height, r = Math.max(4, W / 160);
+  var st = document.getElementById("status");
+  if (L && L.unusable) { ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(0, 0, W, H); st.innerHTML = '<span class="done">unusable</span>'; return; }
+  ["top", "bot"].forEach(function (k) {
+    var pts = (L && L[k]) || [], col = getComputedStyle(document.documentElement).getPropertyValue(k === "top" ? "--top" : "--bot");
+    var px = pts.map(function (p) { return [p[0] * W, p[1] * H]; });
+    ctx.lineWidth = r / 2; ctx.strokeStyle = col; ctx.fillStyle = col;
+    if (px.length === 3) { ctx.beginPath(); halfEllipse(px).forEach(function (q, i) { i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke(); }
+    px.forEach(function (q) { ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, 7); ctx.fill(); });
+  });
+  var ok = L && L.top && L.top.length === 3 && L.bot && L.bot.length === 3;
+  st.innerHTML = ok ? '<span class="done">labelled</span>' : "";
+}
+function evPt(e) { var b = cv.getBoundingClientRect(); return [(e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height]; }
+cv.addEventListener("pointerdown", function (e) {
+  var p = evPt(e), L = lab(); L.unusable = false;
+  // drag an existing point if close
+  for (var k of ["top", "bot"]) for (var i = 0; i < L[k].length; i++) {
+    var q = L[k][i]; if (Math.hypot((q[0] - p[0]) * cv.width, (q[1] - p[1]) * cv.height) < cv.width / 40) { drag = [k, i]; cv.setPointerCapture(e.pointerId); return; }
+  }
+  if (L[rim].length >= 3) L[rim] = [];
+  L[rim].push(p); save(); draw();
+  if (rim === "top" && L.top.length === 3 && L.bot.length < 3) setRim("bot");
+});
+cv.addEventListener("pointermove", function (e) { if (!drag) return; lab()[drag[0]][drag[1]] = evPt(e); draw(); });
+cv.addEventListener("pointerup", function () { if (drag) { drag = null; save(); } });
+function setRim(r) { rim = r; document.getElementById("tTop").classList.toggle("on", r === "top"); document.getElementById("tBot").classList.toggle("on", r === "bot"); }
+document.getElementById("tTop").onclick = function () { setRim("top"); };
+document.getElementById("tBot").onclick = function () { setRim("bot"); };
+document.getElementById("prev").onclick = function () { idx = (idx + photos.length - 1) % photos.length; setRim("top"); show(); };
+document.getElementById("next").onclick = function () { idx = (idx + 1) % photos.length; setRim("top"); show(); };
+document.getElementById("clear").onclick = function () { delete labels[cur().key]; save(); setRim("top"); draw(); };
+document.getElementById("skip").onclick = function () { labels[cur().key] = { top: [], bot: [], unusable: true }; save(); draw(); };
+function done() { return Object.keys(labels).filter(function (k) { var L = labels[k]; return L.unusable || (L.top.length === 3 && L.bot.length === 3); }); }
+function updCount() { document.getElementById("count").textContent = done().length + " photos labelled"; }
+document.getElementById("copy").onclick = function () {
+  var out = {}; done().forEach(function (k) { out[k] = labels[k]; });
+  var txt = JSON.stringify(out); document.getElementById("out").value = txt;
+  try { navigator.clipboard.writeText(txt); } catch (e) {}
+};
+document.addEventListener("keydown", function (e) { if (e.key === "ArrowRight") document.getElementById("next").click(); if (e.key === "ArrowLeft") document.getElementById("prev").click(); });
+loadSets();
+</script>
+</body>
+</html>

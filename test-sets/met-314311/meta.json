@@ -1,0 +1,23 @@
+{
+  "id": "met-314311",
+  "source_url": "https://www.metmuseum.org/art/collection/search/314311",
+  "title": "Cylindrical Vessel",
+  "objectDate": "7th\u20138th century",
+  "dimensions": "H. 5 1/4 x Diam. 4 1/8 in. (13.3 x 10.5 cm)",
+  "isPublicDomain": true,
+  "note": "Met image server blocks scripted downloads; files not stored locally. Save them by hand into photos/ (move any rollout photo to rollout/) if needed for eval.",
+  "images": [
+    {
+      "file": "photos/01.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/DP-575-001.jpg"
+    },
+    {
+      "file": "photos/02.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/1983.543.3_a.JPG"
+    },
+    {
+      "file": "photos/03.jpg",
+      "url": "https://images.metmuseum.org/CRDImages/ao/original/1983.543.3_b.JPG"
+    }
+  ]
+}
