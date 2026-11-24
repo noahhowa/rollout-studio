@@ -23,6 +23,8 @@ function renderCylinder(tex, p) {
   var C = [0, T[1] + p.dist * Math.sin(el), -p.dist * Math.cos(el)];
   var f = [0, -Math.sin(el), Math.cos(el)], r = [1, 0, 0], u = [0, Math.cos(el), Math.sin(el)];
   var F = H / 2 / Math.tan((p.fov * Math.PI) / 360), rot = ((p.rot || 0) * Math.PI) / 180;
+  var cx = p.cx == null ? W / 2 : p.cx, cy = p.cy == null ? H / 2 : p.cy;
+  var surface = p.trackSurface ? new Uint8ClampedArray(W * H * 4) : null;
   var out = document.createElement("canvas"); out.width = W; out.height = H;
   var ctx = out.getContext("2d"), img = ctx.createImageData(W, H), d = img.data;
   var bg = p.bg || [235, 235, 235];
@@ -32,7 +34,7 @@ function renderCylinder(tex, p) {
     d[k] = td[ti] * shade; d[k + 1] = td[ti + 1] * shade; d[k + 2] = td[ti + 2] * shade;
   }
   for (var py = 0; py < H; py++) for (var px = 0; px < W; px++) {
-    var a = (px - W / 2) / F, b2 = -(py - H / 2) / F;
+    var a = (px - cx) / F, b2 = -(py - cy) / F;
     var dx = f[0] + a * r[0] + b2 * u[0], dy = f[1] + a * r[1] + b2 * u[1], dz = f[2] + a * r[2] + b2 * u[2];
     var k = (py * W + px) * 4; d[k + 3] = 255;
     var A = dx * dx + dz * dz, B = 2 * (C[0] * dx + C[2] * dz), Cc = C[0] * C[0] + C[2] * C[2] - R * R;
@@ -44,6 +46,11 @@ function renderCylinder(tex, p) {
         var hx = C[0] + t1 * dx, hz = C[2] + t1 * dz, th = Math.atan2(hx, -hz);
         var shade = 0.45 + 0.55 * Math.max(0, -(hx * dx + hz * dz) / Math.sqrt(dx * dx + dy * dy + dz * dz));
         texAt(th, y1, shade, k); hit = true;
+        if (surface) {
+          surface[k] = 127.5 * (1 + Math.cos(th + rot));
+          surface[k + 1] = 127.5 * (1 + Math.sin(th + rot));
+          surface[k + 2] = 255 * (1 - y1 / Hc); surface[k + 3] = 255;
+        }
       } else if (y1 > Hc) { // through the opening onto the inner far wall
         var y2 = C[1] + t2 * dy;
         if (y2 >= 0 && y2 <= Hc) { d[k] = 120; d[k + 1] = 80; d[k + 2] = 55; hit = true; }
@@ -60,7 +67,7 @@ function renderCylinder(tex, p) {
   // True rim curves: front arc of the top and bottom circles, projected.
   function proj(P) {
     var v = [P[0] - C[0], P[1] - C[1], P[2] - C[2]], z = v[0] * f[0] + v[1] * f[1] + v[2] * f[2];
-    return { x: W / 2 + (F * (v[0] * r[0] + v[1] * r[1] + v[2] * r[2])) / z, y: H / 2 - (F * (v[0] * u[0] + v[1] * u[1] + v[2] * u[2])) / z };
+    return { x: cx + (F * (v[0] * r[0] + v[1] * r[1] + v[2] * r[2])) / z, y: cy - (F * (v[0] * u[0] + v[1] * u[1] + v[2] * u[2])) / z };
   }
   function arc(yy) {
     var pts = [];
@@ -72,5 +79,12 @@ function renderCylinder(tex, p) {
   }
   // Fraction of the circumference actually visible from the camera (horizontal distance).
   var dh = Math.hypot(C[0], C[2]), visHalf = Math.acos(R / dh);
-  return { canvas: out, truth: { top: arc(Hc), bot: arc(0), visHalfDeg: (visHalf * 180) / Math.PI }, tex: tex, rot: rot };
+  var coordinates = null;
+  if (surface) {
+    coordinates = document.createElement("canvas"); coordinates.width = W; coordinates.height = H;
+    coordinates.getContext("2d").putImageData(new ImageData(surface, W, H), 0, 0);
+  }
+  return { coordinates: coordinates,
+    camera: { center: C, forward: f, right: r, up: u, focal: F, cx: cx, cy: cy, radius: R, height: Hc, rotation: rot },
+    canvas: out, truth: { top: arc(Hc), bot: arc(0), visHalfDeg: (visHalf * 180) / Math.PI }, tex: tex, rot: rot };
 }

@@ -1,0 +1,27 @@
+{
+  "references": [
+    {
+      "id": "met-310364",
+      "file": "test-sets/met-310364/rollout/article-figure-5.jpg",
+      "url": "https://cdn.sanity.io/images/cctd4ker/production/4399313df2860b941dfeab166faca4e2fd6090e2-720x556.jpg",
+      "source": "https://www.metmuseum.org/perspectives/unrolling-maya-ceramic-canvases",
+      "crop": [0.049, 0.105, 0.946, 0.489],
+      "note": "Upper rollout in figure 5. Crop excludes the gray surround and lower vessel. Article copy is 720 px wide."
+    },
+    {
+      "id": "pca4sale-446",
+      "file": "test-sets/pca4sale-446/rollout/06.jpg",
+      "url": "https://www.precolumbianart4sale.com/images/15855_h2048w2048gt.5.jpg",
+      "source": "https://www.precolumbianart4sale.com/exhibition/13/exhibition_works/446",
+      "crop": [0.024, 0.057, 0.984, 0.913],
+      "note": "Kerr K937. Crop excludes the black surround and plinth."
+    }
+  ],
+  "rotations": [0, 52, 119, 184, 247, 304],
+  "scenes": [
+    { "id": "close", "dist": 3.2, "elev": 15 },
+    { "id": "studio", "dist": 6, "elev": 25 },
+    { "id": "far", "dist": 12, "elev": 8 },
+    { "id": "reframed", "dist": 6, "elev": 25, "varyFraming": true }
+  ]
+}

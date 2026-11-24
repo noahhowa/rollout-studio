@@ -92,6 +92,10 @@ The same comparison on the expanded labels, using Playwright Chromium and the pr
 
 The expanded set exposes two larger outliers: `lacma-168977/03.jpg` has 2.34%H top error and `lacma-168399/03.jpg` has 9.74%W bottom endpoint error. The largest bottom curve error remains `pca4sale-446/02.jpg` at 3.81%H.
 
+### Multi-photo rim experiments
+
+Normalized median openness and rim-position priors were tested across all views of each vessel, with each photo normalized to its own detected object bounds. Direct median openness worsened top/bottom rim errors from approximately 0.92/1.42 to 1.05/1.57%H. Local gradient candidate searches with shared shape priors also lost to the existing detector. A small bottom-fit calibration reached about 0.71%H bottom error with entire vessels held out of training, but lacked synthetic validation. These experiments were removed when work moved to the whole-rollout yardstick.
+
 ### Second additional label export
 
 Ten further LACMA labels bring the total to 52, with all existing coordinates preserved. All ten photos downloaded, giving 27 available labelled photos across 12 sets. The 25 labelled Met photos remain unavailable.
@@ -146,6 +150,36 @@ A circle seen by a pinhole camera is **exactly an ellipse**, which is the key st
 5. **Cross-photo consistency.** All photos of one object usually share a camera setup, so a median of the ellipse parameters is a strong prior for outlier photos.
 
 ## Phase 3: automatic depth/perspective correction
+
+### Yardstick milestone
+
+Implemented by `scripts/eval-rollout.js`, with fixtures in `eval/rollout-cases.json`. The committed `eval/rollout-baseline.json` records every pipeline, scene, reference, coverage figure, and runtime version. Browser output goes to `eval/out/rollout-scores.json` and the visual `eval/out/rollout-report.html`.
+
+Run with Node, Playwright Chromium, and Python/Pillow installed:
+
+```sh
+python3 scripts/fetch_rollout_references.py
+node scripts/eval-rollout.js
+```
+
+Each of 12 synthetic sets has six photos at 0°, 52°, 119°, 184°, 247°, and 304°. Textures are deterministic procedural artwork and cropped copies of the two published rollouts, Met 1978.412.206 and Kerr K937/pca4sale-446. Four camera scenes cover close, studio, far, and per-photo changes in zoom and framing. Source links and manually selected crop rectangles are recorded in the fixture manifest. The Met texture is available from figure 5 of its public article through the article CDN.
+
+The known-camera flattening check passes across all 12 sets. Its worst mean angular error is **0.078°**, worst p95 is **0.167°**, and worst image-based texture matching error is **0.093°**. Every oracle has at least 99% circumference and contributor coverage, and at least 95% matched texture columns. The CLI exits unsuccessfully if an oracle exceeds 0.5° mean or p95, required fixtures are missing, or the coverage checks fail. A deliberately incorrect focal length (+10%) scores **2.556°**. Keeping only one view reduces circumference coverage to **36.056%**. Both negative controls are required to be detected.
+
+Synthetic angular MAE in degrees, averaged over the three textures:
+
+| camera scene | known camera | true rims + app sampler | detected rims + app sampler |
+|---|---:|---:|---:|
+| close | 0.077 | 5.521 | 5.440 |
+| studio | 0.075 | 2.752 | 2.702 |
+| far | 0.076 | 1.494 | 1.497 |
+| reframed | 0.076 | 2.776 | 2.975 |
+
+The synthetic compositor uses known rotations, a fixed 14% side crop, and cosine overlap weights. It samples the production `unwarp` function for both app baselines. True rim curves are converted to the production handle format by the existing oracle. Independently ray-traced surface coordinates measure each contributing sample's angular error before blending, so opposite errors cannot cancel at seams. Height error and coverage are also recorded. A separate image score compares the full reconstructed rollout with the source texture using normalized column descriptors. Its whole-rollout loss is `(1 - mean correlation) / 2`, with uncovered or featureless output columns contributing correlation -1. Angular texture matches search ±20° and require correlation at least 0.65, so their matching coverage is always reported.
+
+The real pca4sale baseline registers each of its five strips to the published rollout with one angular shift per photo, then assembles the whole circumference. It scores **5.140°** image-based angular MAE, **14.500°** p95, **60.972%** matched columns, **100%** circumference coverage, and **0.282** whole-rollout loss. Real-photo descriptor matching tolerates ±8.333% vertical displacement because the published texture's framing differs. This is a reference-registered flattening baseline. Synthetic assemblies use known rotations. These baselines isolate flattening and use the evaluation compositor in place of the hosted stitcher.
+
+The real-photo Met comparison is explicitly marked **missing photos**. The published Met texture participates in all four synthetic sets and passes the camera check, while its original collection photos remain blocked by the image server.
 
 Replace the orthographic sampler with a camera model.
 
