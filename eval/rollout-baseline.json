@@ -1,0 +1,1307 @@
+{
+  "synthetic": [
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "procedural/close",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.07746168487158235,
+            "angleP95Deg": 0.16644996172665621,
+            "heightMAEPct": 0.06393853254155801,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.97461718379826
+          },
+          "texture": {
+            "angleMAEDeg": 0.0930555555555556,
+            "angleP95Deg": 0.5,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9733897065353678,
+            "wholeRolloutLoss": 0.013305146732316087,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "procedural/close",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 5.501428427221798,
+            "angleP95Deg": 9.148462286159008,
+            "heightMAEPct": 4.181244436255973,
+            "coveragePct": 99.9988425925926,
+            "contributionCoveragePct": 99.76123489519762
+          },
+          "texture": {
+            "angleMAEDeg": 8.780952380952382,
+            "angleP95Deg": 17.000000000000007,
+            "matchedColumnsPct": 14.583333333333334,
+            "meanCorrelation": 0.29742611241490374,
+            "wholeRolloutLoss": 0.3512869437925481,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "procedural/close",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 4.979172754250101,
+            "angleP95Deg": 8.292981872688673,
+            "heightMAEPct": 2.4207508919557235,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.9999999999663
+          },
+          "texture": {
+            "angleMAEDeg": 4.228682170542636,
+            "angleP95Deg": 10.5,
+            "matchedColumnsPct": 17.916666666666668,
+            "meanCorrelation": 0.12730884247170562,
+            "wholeRolloutLoss": 0.4363455787641472,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": {
+        "wrongFocal": {
+          "angleMAEDeg": 2.556070637868507,
+          "angleP95Deg": 4.25613298438533,
+          "heightMAEPct": 3.1574540677928518,
+          "coveragePct": 90.45254629629629,
+          "contributionCoveragePct": 89.13778878737605
+        },
+        "missingViews": {
+          "angleMAEDeg": 0.07532863485734315,
+          "angleP95Deg": 0.17530234452200555,
+          "heightMAEPct": 0.0557805006724778,
+          "coveragePct": 36.05555555555556,
+          "contributionCoveragePct": 99.9281847837306
+        }
+      },
+      "rows": [
+        {
+          "id": "procedural/studio",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.0753872861274196,
+            "angleP95Deg": 0.16385846011981403,
+            "heightMAEPct": 0.05907036857892041,
+            "coveragePct": 99.98148148148148,
+            "contributionCoveragePct": 99.92818478369732
+          },
+          "texture": {
+            "angleMAEDeg": 0.03263888888888886,
+            "angleP95Deg": 0.5,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9879704308404713,
+            "wholeRolloutLoss": 0.006014784579764343,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "procedural/studio",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.751930943932972,
+            "angleP95Deg": 4.586152662568105,
+            "heightMAEPct": 2.961823924572458,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.8831033055527
+          },
+          "texture": {
+            "angleMAEDeg": 7.084795321637427,
+            "angleP95Deg": 18.5,
+            "matchedColumnsPct": 23.75,
+            "meanCorrelation": 0.4263120135176417,
+            "wholeRolloutLoss": 0.28684399324117915,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "procedural/studio",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.682182658123436,
+            "angleP95Deg": 4.475785365812476,
+            "heightMAEPct": 2.986181478953962,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.99888862750548
+          },
+          "texture": {
+            "angleMAEDeg": 7.067647058823529,
+            "angleP95Deg": 18.5,
+            "matchedColumnsPct": 23.61111111111111,
+            "meanCorrelation": 0.42915721810902013,
+            "wholeRolloutLoss": 0.2854213909454899,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "procedural/far",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.07611330768202682,
+            "angleP95Deg": 0.16577138924025964,
+            "heightMAEPct": 0.06314887380891519,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.99879904902006
+          },
+          "texture": {
+            "angleMAEDeg": 0.00625,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9987914708597493,
+            "wholeRolloutLoss": 0.0006042645701253568,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "procedural/far",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 1.4936356438514138,
+            "angleP95Deg": 2.492223242697879,
+            "heightMAEPct": 0.4531543819359644,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.99214974107122
+          },
+          "texture": {
+            "angleMAEDeg": 1.1423611111111112,
+            "angleP95Deg": 3,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.8414937917042451,
+            "wholeRolloutLoss": 0.07925310414787745,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "procedural/far",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 1.4982853790287776,
+            "angleP95Deg": 2.4973112239813293,
+            "heightMAEPct": 0.5472203617741843,
+            "coveragePct": 99.99363425925925,
+            "contributionCoveragePct": 99.94764134262188
+          },
+          "texture": {
+            "angleMAEDeg": 1.2055555555555555,
+            "angleP95Deg": 3,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.8234070071391363,
+            "wholeRolloutLoss": 0.08829649643043186,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "procedural/reframed",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.0758570438970943,
+            "angleP95Deg": 0.16540945894630793,
+            "heightMAEPct": 0.05937104206301164,
+            "coveragePct": 99.90162037037037,
+            "contributionCoveragePct": 99.54071577059
+          },
+          "texture": {
+            "angleMAEDeg": 0.029861111111111085,
+            "angleP95Deg": 0.5,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9876416141635098,
+            "wholeRolloutLoss": 0.006179192918245091,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "procedural/reframed",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.7711011929217935,
+            "angleP95Deg": 4.609094501341003,
+            "heightMAEPct": 2.968422197198464,
+            "coveragePct": 99.89293981481481,
+            "contributionCoveragePct": 99.4076734179893
+          },
+          "texture": {
+            "angleMAEDeg": 7.026946107784431,
+            "angleP95Deg": 18.5,
+            "matchedColumnsPct": 23.194444444444443,
+            "meanCorrelation": 0.4265785798006566,
+            "wholeRolloutLoss": 0.2867107100996717,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "procedural/reframed",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 3.041467061654047,
+            "angleP95Deg": 6.206356012657605,
+            "heightMAEPct": 5.33670745821598,
+            "coveragePct": 99.73842592592592,
+            "contributionCoveragePct": 99.6631090554013
+          },
+          "texture": {
+            "angleMAEDeg": 6.978125,
+            "angleP95Deg": 18,
+            "matchedColumnsPct": 22.22222222222222,
+            "meanCorrelation": 0.3783658789991172,
+            "wholeRolloutLoss": 0.3108170605004414,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "met-310364/close",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.07750942900483204,
+            "angleP95Deg": 0.16667375423518654,
+            "heightMAEPct": 0.06403674240496574,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.97000110317661
+          },
+          "texture": {
+            "angleMAEDeg": 0.0006944444444444445,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9767618263028429,
+            "wholeRolloutLoss": 0.011619086848578541,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "met-310364/close",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 5.502515617710039,
+            "angleP95Deg": 9.147199444721235,
+            "heightMAEPct": 4.157629512069764,
+            "coveragePct": 99.99247685185185,
+            "contributionCoveragePct": 99.74462087817295
+          },
+          "texture": {
+            "angleMAEDeg": 6.666666666666672,
+            "angleP95Deg": 13.000000000000002,
+            "matchedColumnsPct": 5.833333333333333,
+            "meanCorrelation": 0.21819027748656752,
+            "wholeRolloutLoss": 0.39090486125671625,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "met-310364/close",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 5.015760437770954,
+            "angleP95Deg": 8.345144904492896,
+            "heightMAEPct": 2.5962116247883307,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.9999999999663
+          },
+          "texture": {
+            "angleMAEDeg": 3.2758620689655187,
+            "angleP95Deg": 11.5,
+            "matchedColumnsPct": 4.027777777777778,
+            "meanCorrelation": 0.1820375097896069,
+            "wholeRolloutLoss": 0.40898124510519657,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "met-310364/studio",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.0754119759763246,
+            "angleP95Deg": 0.16425385402823983,
+            "heightMAEPct": 0.05832863378050309,
+            "coveragePct": 99.97743055555556,
+            "contributionCoveragePct": 99.91213704859506
+          },
+          "texture": {
+            "angleMAEDeg": 0,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9828289934981386,
+            "wholeRolloutLoss": 0.008585503250930715,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "met-310364/studio",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.7511796381626556,
+            "angleP95Deg": 4.581879213087684,
+            "heightMAEPct": 2.9501179594007767,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.88861175559381
+          },
+          "texture": {
+            "angleMAEDeg": 4.0465116279069795,
+            "angleP95Deg": 10.999999999999998,
+            "matchedColumnsPct": 5.972222222222222,
+            "meanCorrelation": 0.2729236213826958,
+            "wholeRolloutLoss": 0.3635381893086521,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "met-310364/studio",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.7198696101660267,
+            "angleP95Deg": 4.508679247669388,
+            "heightMAEPct": 3.259045750250425,
+            "coveragePct": 99.97569444444444,
+            "contributionCoveragePct": 99.88768939970369
+          },
+          "texture": {
+            "angleMAEDeg": 4.3584905660377355,
+            "angleP95Deg": 12.5,
+            "matchedColumnsPct": 7.361111111111111,
+            "meanCorrelation": 0.263577935577625,
+            "wholeRolloutLoss": 0.3682110322111875,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "met-310364/far",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.07612066669728937,
+            "angleP95Deg": 0.16573505555962698,
+            "heightMAEPct": 0.06303509820762378,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.99957491662201
+          },
+          "texture": {
+            "angleMAEDeg": 0.0006944444444444445,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9858884476441248,
+            "wholeRolloutLoss": 0.007055776177937623,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "met-310364/far",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 1.4936439669468455,
+            "angleP95Deg": 2.492388327429164,
+            "heightMAEPct": 0.451146426481565,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.98470800552671
+          },
+          "texture": {
+            "angleMAEDeg": 1.239803094233474,
+            "angleP95Deg": 2.5,
+            "matchedColumnsPct": 98.75,
+            "meanCorrelation": 0.6135777028961098,
+            "wholeRolloutLoss": 0.1932111485519451,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "met-310364/far",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 1.499638674208213,
+            "angleP95Deg": 2.4973112239813293,
+            "heightMAEPct": 0.8874400317513196,
+            "coveragePct": 99.61342592592592,
+            "contributionCoveragePct": 99.59993383536617
+          },
+          "texture": {
+            "angleMAEDeg": 1.9641909814323608,
+            "angleP95Deg": 6.500000000000001,
+            "matchedColumnsPct": 52.361111111111114,
+            "meanCorrelation": 0.5107916153193248,
+            "wholeRolloutLoss": 0.2446041923403376,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "met-310364/reframed",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.0758251907229945,
+            "angleP95Deg": 0.16525955399830686,
+            "heightMAEPct": 0.0593835789017891,
+            "coveragePct": 99.91145833333333,
+            "contributionCoveragePct": 99.58285064550559
+          },
+          "texture": {
+            "angleMAEDeg": 0,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9829762191931632,
+            "wholeRolloutLoss": 0.008511890403418376,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "met-310364/reframed",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.770575537811163,
+            "angleP95Deg": 4.608611522119371,
+            "heightMAEPct": 2.951587921569329,
+            "coveragePct": 99.890625,
+            "contributionCoveragePct": 99.40575483276368
+          },
+          "texture": {
+            "angleMAEDeg": 3.5384615384615405,
+            "angleP95Deg": 10.999999999999998,
+            "matchedColumnsPct": 5.416666666666667,
+            "meanCorrelation": 0.2734058039948588,
+            "wholeRolloutLoss": 0.3632970980025706,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "met-310364/reframed",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.8388606318714915,
+            "angleP95Deg": 4.904124201983812,
+            "heightMAEPct": 5.415647458525847,
+            "coveragePct": 99.93229166666667,
+            "contributionCoveragePct": 99.8229213735749
+          },
+          "texture": {
+            "angleMAEDeg": 3.249999999999999,
+            "angleP95Deg": 10.999999999999998,
+            "matchedColumnsPct": 4.444444444444445,
+            "meanCorrelation": 0.24492923461726773,
+            "wholeRolloutLoss": 0.3775353826913661,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "pca4sale-446/close",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.07751946523635489,
+            "angleP95Deg": 0.16649803818342843,
+            "heightMAEPct": 0.06457897451975442,
+            "coveragePct": 99.85185185185185,
+            "contributionCoveragePct": 99.44737936663917
+          },
+          "texture": {
+            "angleMAEDeg": 0,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9823352272470973,
+            "wholeRolloutLoss": 0.00883238637645134,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "pca4sale-446/close",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 5.560285408639546,
+            "angleP95Deg": 9.238813205333615,
+            "heightMAEPct": 4.421428587793615,
+            "coveragePct": 99.90162037037037,
+            "contributionCoveragePct": 99.27165769356579
+          },
+          "texture": {
+            "angleMAEDeg": 4.04,
+            "angleP95Deg": 10.5,
+            "matchedColumnsPct": 3.4722222222222223,
+            "meanCorrelation": 0.18530632942035213,
+            "wholeRolloutLoss": 0.40734683528982396,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "pca4sale-446/close",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 6.324246028627097,
+            "angleP95Deg": 12.165265151776934,
+            "heightMAEPct": 9.219881993146567,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.97831426275991
+          },
+          "texture": {
+            "angleMAEDeg": 4.568965517241377,
+            "angleP95Deg": 9.5,
+            "matchedColumnsPct": 4.027777777777778,
+            "meanCorrelation": 0.12134714908322491,
+            "wholeRolloutLoss": 0.4393264254583875,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "pca4sale-446/studio",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.07542097128501944,
+            "angleP95Deg": 0.16425232388268773,
+            "heightMAEPct": 0.05909171479194549,
+            "coveragePct": 99.99189814814815,
+            "contributionCoveragePct": 99.95533979538224
+          },
+          "texture": {
+            "angleMAEDeg": 0,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9853880372928917,
+            "wholeRolloutLoss": 0.007305981353554147,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "pca4sale-446/studio",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.7528051754733465,
+            "angleP95Deg": 4.5897474559492295,
+            "heightMAEPct": 3.129534674798569,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.8949508681886
+          },
+          "texture": {
+            "angleMAEDeg": 3.641891891891892,
+            "angleP95Deg": 8.5,
+            "matchedColumnsPct": 10.277777777777779,
+            "meanCorrelation": 0.300920360544992,
+            "wholeRolloutLoss": 0.34953981972750403,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "pca4sale-446/studio",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.7048788926142726,
+            "angleP95Deg": 4.495365284547756,
+            "heightMAEPct": 3.1179543025988843,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.95785518986519
+          },
+          "texture": {
+            "angleMAEDeg": 4.431818181818182,
+            "angleP95Deg": 13.5,
+            "matchedColumnsPct": 12.222222222222221,
+            "meanCorrelation": 0.3124637823489108,
+            "wholeRolloutLoss": 0.3437681088255446,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "pca4sale-446/far",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.07607446841174458,
+            "angleP95Deg": 0.16587197528468295,
+            "heightMAEPct": 0.06384035192157424,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.99997546244677
+          },
+          "texture": {
+            "angleMAEDeg": 0,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9890298184613194,
+            "wholeRolloutLoss": 0.005485090769340284,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "pca4sale-446/far",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 1.4932411480006953,
+            "angleP95Deg": 2.492388327429173,
+            "heightMAEPct": 0.47762102588421274,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.98811659563094
+          },
+          "texture": {
+            "angleMAEDeg": 1.6679447852760736,
+            "angleP95Deg": 4,
+            "matchedColumnsPct": 90.55555555555556,
+            "meanCorrelation": 0.6372991832944911,
+            "wholeRolloutLoss": 0.18135040835275446,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "pca4sale-446/far",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 1.4939940865791879,
+            "angleP95Deg": 2.5040412893929305,
+            "heightMAEPct": 0.4629185048687135,
+            "coveragePct": 100,
+            "contributionCoveragePct": 99.9999999999663
+          },
+          "texture": {
+            "angleMAEDeg": 1.652073732718894,
+            "angleP95Deg": 4,
+            "matchedColumnsPct": 90.41666666666667,
+            "meanCorrelation": 0.6345944932816943,
+            "wholeRolloutLoss": 0.18270275335915287,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    },
+    {
+      "controls": null,
+      "rows": [
+        {
+          "id": "pca4sale-446/reframed",
+          "pipeline": "known camera",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 0.07591525908849796,
+            "angleP95Deg": 0.165753556974014,
+            "heightMAEPct": 0.059607841620979304,
+            "coveragePct": 99.89814814814815,
+            "contributionCoveragePct": 99.23581760534553
+          },
+          "texture": {
+            "angleMAEDeg": 0,
+            "angleP95Deg": 0,
+            "matchedColumnsPct": 100,
+            "meanCorrelation": 0.9822110462815977,
+            "wholeRolloutLoss": 0.00889447685920114,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "pca4sale-446/reframed",
+          "pipeline": "true rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 2.787573855274083,
+            "angleP95Deg": 4.633513896476135,
+            "heightMAEPct": 3.132656233533253,
+            "coveragePct": 99.89930555555556,
+            "contributionCoveragePct": 99.19829292815041
+          },
+          "texture": {
+            "angleMAEDeg": 3.6357142857142852,
+            "angleP95Deg": 8.5,
+            "matchedColumnsPct": 9.722222222222221,
+            "meanCorrelation": 0.2998539040038649,
+            "wholeRolloutLoss": 0.35007304799806754,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        },
+        {
+          "id": "pca4sale-446/reframed",
+          "pipeline": "detected rims + app sampler",
+          "photos": 6,
+          "rotationsDeg": [
+            0,
+            52,
+            119,
+            184,
+            247,
+            304
+          ],
+          "geometry": {
+            "angleMAEDeg": 3.0453887206449517,
+            "angleP95Deg": 6.305673579662482,
+            "heightMAEPct": 5.467157859647915,
+            "coveragePct": 99.97685185185185,
+            "contributionCoveragePct": 99.87057702294409
+          },
+          "texture": {
+            "angleMAEDeg": 4.970588235294117,
+            "angleP95Deg": 13.000000000000002,
+            "matchedColumnsPct": 7.083333333333333,
+            "meanCorrelation": 0.24960995167090014,
+            "wholeRolloutLoss": 0.3751950241645499,
+            "verticalTolerancePct": 0,
+            "phaseDeg": 0,
+            "searchLimitDeg": 20
+          }
+        }
+      ]
+    }
+  ],
+  "published": [
+    {
+      "id": "met-310364",
+      "status": "missing photos",
+      "source": "https://www.metmuseum.org/perspectives/unrolling-maya-ceramic-canvases"
+    },
+    {
+      "id": "pca4sale-446",
+      "status": "scored",
+      "photos": 5,
+      "source": "https://www.precolumbianart4sale.com/exhibition/13/exhibition_works/446",
+      "registrations": [
+        {
+          "src": "/test-sets/pca4sale-446/photos/01.jpg",
+          "rotationDeg": 70,
+          "correlation": 0.43222598408391366
+        },
+        {
+          "src": "/test-sets/pca4sale-446/photos/02.jpg",
+          "rotationDeg": 130.5,
+          "correlation": 0.4454500187244764
+        },
+        {
+          "src": "/test-sets/pca4sale-446/photos/03.jpg",
+          "rotationDeg": -129,
+          "correlation": 0.4859317390034711
+        },
+        {
+          "src": "/test-sets/pca4sale-446/photos/04.jpg",
+          "rotationDeg": -87,
+          "correlation": 0.42845158133475175
+        },
+        {
+          "src": "/test-sets/pca4sale-446/photos/05.jpg",
+          "rotationDeg": 26.5,
+          "correlation": 0.4543903949650686
+        }
+      ],
+      "geometry": {
+        "angleMAEDeg": null,
+        "angleP95Deg": null,
+        "heightMAEPct": null,
+        "coveragePct": 100,
+        "contributionCoveragePct": 100.0000000000099
+      },
+      "texture": {
+        "angleMAEDeg": 5.140091116173121,
+        "angleP95Deg": 14.5,
+        "matchedColumnsPct": 60.97222222222222,
+        "meanCorrelation": 0.43680126249335394,
+        "wholeRolloutLoss": 0.28159936875332303,
+        "verticalTolerancePct": 8.333333333333334,
+        "phaseDeg": 358.5,
+        "searchLimitDeg": 20
+      }
+    }
+  ],
+  "missingReferences": [],
+  "config": {
+    "references": [
+      {
+        "id": "met-310364",
+        "file": "test-sets/met-310364/rollout/article-figure-5.jpg",
+        "url": "https://cdn.sanity.io/images/cctd4ker/production/4399313df2860b941dfeab166faca4e2fd6090e2-720x556.jpg",
+        "source": "https://www.metmuseum.org/perspectives/unrolling-maya-ceramic-canvases",
+        "crop": [
+          0.049,
+          0.105,
+          0.946,
+          0.489
+        ],
+        "note": "Upper rollout in figure 5. Crop excludes the gray surround and lower vessel. Article copy is 720 px wide."
+      },
+      {
+        "id": "pca4sale-446",
+        "file": "test-sets/pca4sale-446/rollout/06.jpg",
+        "url": "https://www.precolumbianart4sale.com/images/15855_h2048w2048gt.5.jpg",
+        "source": "https://www.precolumbianart4sale.com/exhibition/13/exhibition_works/446",
+        "crop": [
+          0.024,
+          0.057,
+          0.984,
+          0.913
+        ],
+        "note": "Kerr K937. Crop excludes the black surround and plinth."
+      }
+    ],
+    "rotations": [
+      0,
+      52,
+      119,
+      184,
+      247,
+      304
+    ],
+    "scenes": [
+      {
+        "id": "close",
+        "dist": 3.2,
+        "elev": 15
+      },
+      {
+        "id": "studio",
+        "dist": 6,
+        "elev": 25
+      },
+      {
+        "id": "far",
+        "dist": 12,
+        "elev": 8
+      },
+      {
+        "id": "reframed",
+        "dist": 6,
+        "elev": 25,
+        "varyFraming": true
+      }
+    ]
+  },
+  "check": {
+    "negativeControls": {
+      "wrongFocal": {
+        "angleMAEDeg": 2.556070637868507,
+        "angleP95Deg": 4.25613298438533,
+        "heightMAEPct": 3.1574540677928518,
+        "coveragePct": 90.45254629629629,
+        "contributionCoveragePct": 89.13778878737605
+      },
+      "missingViews": {
+        "angleMAEDeg": 0.07532863485734315,
+        "angleP95Deg": 0.17530234452200555,
+        "heightMAEPct": 0.0557805006724778,
+        "coveragePct": 36.05555555555556,
+        "contributionCoveragePct": 99.9281847837306
+      }
+    },
+    "negativeControlsPassed": true,
+    "thresholdDeg": 0.5,
+    "minimumCoveragePct": 99,
+    "passed": true,
+    "maxAngleMAEDeg": 0.07751946523635489,
+    "maxAngleP95Deg": 0.16667375423518654,
+    "maxTextureAngleMAEDeg": 0.0930555555555556
+  },
+  "runtime": {
+    "browser": "159.0.8154.6",
+    "node": "v26.13.1"
+  }
+}
