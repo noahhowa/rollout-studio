@@ -12,6 +12,13 @@ const { chromium } = require("playwright");
 const ROOT = path.resolve(__dirname, "..");
 const labels = JSON.parse(fs.readFileSync(path.join(ROOT, "test-sets/rectify-labels.json"), "utf8"));
 const stitched = JSON.parse(fs.readFileSync(path.join(ROOT, "test-sets/stitched.json"), "utf8")).sets;
+// Local-only ground truth (photos that can't be committed): test-sets/<id>/rectify-labels.local.json
+for (const id of fs.readdirSync(path.join(ROOT, "test-sets"))) {
+  const lf = path.join(ROOT, "test-sets", id, "rectify-labels.local.json");
+  if (!fs.existsSync(lf)) continue;
+  Object.assign(labels, JSON.parse(fs.readFileSync(lf, "utf8")));
+  if (!stitched.some((x) => x.id === id)) stitched.push({ id, file: `test-sets/${id}/stitched/hf.jpg` });
+}
 
 (async () => {
   const server = http.createServer((q, r) => {

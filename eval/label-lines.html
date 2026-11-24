@@ -20,6 +20,7 @@ textarea{width:100%;height:70px;font:12px monospace;margin-top:8px;background:va
 <body>
 <div class="bar">
   <select id="set"></select>
+  <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="file" id="localImg" accept="image/*" style="display:none"><button type="button" onclick="document.getElementById('localImg').click()">Open image…</button></label>
   <button id="newLine">New line</button>
   <button id="undo">Undo point</button>
   <button id="clear">Clear panorama</button>
@@ -47,7 +48,18 @@ async function load() {
   sel.onchange = function () { show(sel.value); };
   show(sets[0].id); updCount();
 }
-function show(id) { cur = id; var s = sets.find(function (x) { return x.id === id; }); img.onload = function () { cv.width = img.naturalWidth; cv.height = img.naturalHeight; draw(); }; img.src = "../" + s.file; }
+// Open a panorama from this computer (e.g. your own stitch): it stays in the browser; labels are
+// keyed "local:<file name>" and copied out with the rest.
+document.getElementById("localImg").onchange = function (e) {
+  var f = e.target.files[0]; if (!f) return;
+  var id = "local:" + f.name, url = URL.createObjectURL(f);
+  if (!sets.some(function (x) { return x.id === id; })) {
+    sets.push({ id: id, url: url });
+    var o = document.createElement("option"); o.value = id; o.textContent = id; document.getElementById("set").appendChild(o);
+  } else sets.find(function (x) { return x.id === id; }).url = url;
+  document.getElementById("set").value = id; show(id);
+};
+function show(id) { cur = id; var s = sets.find(function (x) { return x.id === id; }); img.onload = function () { cv.width = img.naturalWidth; cv.height = img.naturalHeight; draw(); }; img.src = s.url || "../" + s.file; }
 function draw() {
   ctx.drawImage(img, 0, 0);
   var L = labels[cur], r = Math.max(4, cv.width / 300);

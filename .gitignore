@@ -6,3 +6,4 @@ __pycache__/
 test-sets/*/stitched/
 !test-sets/lacma-*/stitched/
 test-sets/user-*/
+test-sets/*/rectify-labels.local.json
