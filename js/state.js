@@ -33,3 +33,7 @@ function med(a) {
 // Auto-order photos before stitching (Adjust step checkbox). Off by default: the upload order is
 // trusted unless the user asks for reordering.
 var autoOrderOn = false;
+// Bounded vertical overlap correction before stitching (Adjust step checkbox, experimental).
+// Off by default; declined fits fall back to the original strips. Last result in overlapWarpReport.
+var overlapWarpOn = false,
+  overlapWarpReport = null;

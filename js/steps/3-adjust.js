@@ -24,6 +24,12 @@ function renderAdjust() {
     '<input type="checkbox" id="autoOrderToggle"' + (autoOrderOn ? " checked" : "") + '><label for="autoOrderToggle">' + t("autoOrder") + "</label>";
   chk.querySelector("input").onchange = function () { autoOrderOn = this.checked; };
   card.appendChild(chk);
+  var wchk = document.createElement("div");
+  wchk.className = "chk-row";
+  wchk.innerHTML =
+    '<input type="checkbox" id="overlapWarpToggle"' + (overlapWarpOn ? " checked" : "") + '><label for="overlapWarpToggle">' + t("overlapWarp") + "</label>";
+  wchk.querySelector("input").onchange = function () { overlapWarpOn = this.checked; };
+  card.appendChild(wchk);
   var sep = document.createElement("div");
   sep.style.cssText = "height:1px;background:var(--border-lt);margin:14px 0";
   card.appendChild(sep);

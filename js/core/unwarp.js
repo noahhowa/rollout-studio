@@ -196,10 +196,26 @@ function rebuildStripCache() {
     return s;
   });
 }
+// Opt-in overlap warp (Adjust checkbox): fitted on the full Map strips, then the usual crop and
+// feather are applied. Cached until the strips or their order change.
+var overlapWarpCache = null;
+function warpedStrips() {
+  if (!overlapWarpOn || stripCache.length < 2) { overlapWarpReport = null; return stripCache; }
+  var c = overlapWarpCache;
+  if (c && c.src.length === stripCache.length && c.src.every(function (s, i) { return s === stripCache[i]; })) {
+    overlapWarpReport = c.report; return c.out;
+  }
+  var report;
+  try { report = OVERLAPWARP.estimate(stripCache); } catch (e) { report = { declined: e.message }; }
+  var out = report.coefficients ? stripCache.map(function (s, i) { return OVERLAPWARP.apply(s, report.coefficients[i]); }) : stripCache;
+  overlapWarpCache = { src: stripCache.slice(), out: out, report: report };
+  overlapWarpReport = report;
+  return out;
+}
 function buildStrips() {
   if (stripCache.length !== imgs.length) rebuildStripCache();
-  var ff = feather / 100;
+  var ff = feather / 100, src = warpedStrips();
   return imgs.map(function (im, i) {
-    return featherEdges(cropStrip(stripCache[i], im.cropL, im.cropR), ff);
+    return featherEdges(cropStrip(src[i], im.cropL, im.cropR), ff);
   });
 }
