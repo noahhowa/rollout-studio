@@ -8,6 +8,48 @@ fi.onchange = function (e) {
 // Photos keep the order they were selected in. Files load asynchronously and finish in any order
 // (large files later), so each gets a sequence number and is inserted in sequence, not on arrival.
 var uploadSeq = 0;
+// ═══ TIFF support (decoder loaded lazily, pinned versions) ═══
+function isTiff(f) {
+  return /\.tiff?$/i.test(f.name) || f.type === "image/tiff";
+}
+var tiffLibs = null;
+function loadScript(src) {
+  return new Promise(function (ok, no) {
+    var s = document.createElement("script");
+    s.src = src;
+    s.onload = ok;
+    s.onerror = function () { no(new Error("could not load " + src)); };
+    document.head.appendChild(s);
+  });
+}
+function loadTiffLib() {
+  if (window.UTIF) return Promise.resolve();
+  if (!tiffLibs) {
+    // pako is only needed for Deflate-compressed TIFFs, so its failure is not fatal.
+    tiffLibs = loadScript("https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js")
+      .catch(function () {})
+      .then(function () { return loadScript("https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"); })
+      .catch(function (e) { tiffLibs = null; throw e; });
+  }
+  return tiffLibs;
+}
+// Decode the first TIFF page to a PNG data URL (8/16-bit RGB(A) and greyscale as UTIF supports).
+function tiffToDataURL(buf) {
+  return loadTiffLib().then(function () {
+    var ifds = UTIF.decode(buf);
+    if (!ifds.length) throw new Error("empty TIFF");
+    UTIF.decodeImage(buf, ifds[0]);
+    var pg = ifds[0], w = pg.width, h = pg.height;
+    if (!w || !h || !pg.data || !pg.data.length) throw new Error("unsupported TIFF");
+    var rgba = new Uint8ClampedArray(UTIF.toRGBA8(pg));
+    if (rgba.length !== w * h * 4) throw new Error("unsupported TIFF");
+    var c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    c.getContext("2d").putImageData(new ImageData(rgba, w, h), 0, 0);
+    return c.toDataURL("image/png");
+  });
+}
 function doFiles(fs) {
   Array.from(fs).forEach(function (f) {
     if (/\.json$/i.test(f.name)) {
@@ -15,6 +57,19 @@ function doFiles(fs) {
       return;
     }
     var seq = uploadSeq++, r = new FileReader();
+    // TIFF: most browsers can't decode it in <img>, so decode with UTIF.js into a PNG data URL
+    // (also keeps sessions reloadable anywhere), then continue down the normal loadSrc path.
+    if (isTiff(f)) {
+      r.onload = function (e) {
+        tiffToDataURL(e.target.result).then(function (u) {
+          loadSrc(u, seq);
+        }, function (err) {
+          alert(t("tiffFailed") + f.name + " (" + (err && err.message || err) + ")");
+        });
+      };
+      r.readAsArrayBuffer(f);
+      return;
+    }
     r.onload = function (e) {
       loadSrc(e.target.result, seq);
     };
