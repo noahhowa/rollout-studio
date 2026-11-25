@@ -41,7 +41,7 @@ var KEY = "rollout-rim-labels-v1", labels = {};
 try { labels = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(labels)); } catch (e) {} updCount(); }
 var sets = [], photos = [], idx = 0, rim = "top", img = new Image(), cv = document.getElementById("cv"), ctx = cv.getContext("2d"), drag = null;
-function small(u) { return u.replace("/original/", "/web-large/"); }
+function small(u) { return (u || "").replace("/original/", "/web-large/"); }
 function cur() { return photos[idx]; }
 function lab() { var k = cur().key; return labels[k] || (labels[k] = { top: [], bot: [] }); }
 async function loadSets() {
@@ -53,10 +53,14 @@ async function loadSets() {
   var selected = (query.get("sets") || "").split(",").filter(Boolean);
   var unlabelled = query.get("unlabelled") === "1";
   var m = await (await fetch("../test-sets/manifest.json")).json();
+  // Explicit queues can also use checked-in fixture metadata outside the download manifest.
+  selected.forEach(function (id) {
+    if (/^[a-z0-9-]+$/.test(id) && !m.sets.some(function (s) { return s.id === id; })) m.sets.push({ id: id, source: "local" });
+  });
   for (var s of m.sets) {
     if (selected.length && selected.indexOf(s.id) < 0) continue;
     // Prefer local fixtures. Museum URLs provide a fallback for photos not downloaded yet.
-    if (["met", "lacma", "precolumbianart4sale", "sothebys", "christies"].indexOf(s.source) < 0) continue;
+    if (["met", "lacma", "precolumbianart4sale", "sothebys", "christies", "local"].indexOf(s.source) < 0) continue;
     try {
       var meta = await (await fetch("../test-sets/" + s.id + "/meta.json")).json();
       var ph = (meta.images || []).filter(function (i) { return i.file.indexOf("photos/") === 0; });
@@ -84,7 +88,7 @@ function show() {
   img.onload = function () { cv.width = img.naturalWidth; cv.height = img.naturalHeight; draw(); };
   var photo = cur(), fallback = false;
   img.onerror = function () {
-    if (!fallback) { fallback = true; img.src = photo.url; }
+    if (!fallback && photo.url) { fallback = true; img.src = photo.url; }
     else document.getElementById("status").textContent = "Could not load this photo.";
   };
   img.src = photo.local;

@@ -92,7 +92,7 @@ var RIM2 = (function () {
 
   // A contact shadow can re-expand below a rounded base and survive component merging.
   // Stop at a sudden shelf after the silhouette has already tapered toward its centre.
-  function trimShadowShelf(mask, W, H) {
+  function trimShadowShelf(mask, W, H, trimNecks, minBaseRow) {
     var spans = [], widths = [], first = -1, last = -1;
     for (var y = 0; y < H; y++) {
       var span = rowSpan(mask, W, y); spans.push(span);
@@ -105,6 +105,24 @@ var RIM2 = (function () {
     }
     var bodyWidth = median(widths), lookback = Math.max(2, Math.round(0.008 * height));
     if (bodyWidth < 10) return mask;
+    if (trimNecks) {
+      // A contact shadow may reconnect through a narrow waist and widen gradually.
+      // Cut at that waist, rather than requiring one abrupt jump to full body width.
+      var neckWindow = Math.max(4, Math.round(0.035 * height));
+      for (y = Math.max(Math.round(first + 0.7 * height), Math.round(minBaseRow)); y <= last; y++) {
+        if (!spans[y]) continue;
+        var low = bodyWidth, lowRow = -1;
+        for (var prev = Math.max(first, y - neckWindow); prev < y; prev++) {
+          if (!spans[prev]) continue;
+          var width = spans[prev].r - spans[prev].l + 1;
+          if (width < low) { low = width; lowRow = prev; }
+        }
+        var current = spans[y].r - spans[y].l + 1;
+        if (lowRow >= 0 && low < 0.65 * bodyWidth && current - low > 0.2 * bodyWidth) {
+          mask.fill(0, (lowRow + 1) * W); return mask;
+        }
+      }
+    }
     for (y = Math.round(first + 0.7 * height); y <= last; y++) {
       var before = spans[y - lookback], now = spans[y];
       if (!before || !now) continue;
@@ -298,8 +316,26 @@ var RIM2 = (function () {
       topH: toHandles(top), botH: toHandles(bot), topE: top, botE: bot };
   }
 
-  function recoverFlatRimWidth(e, mask, W, height) {
+  function recoverFlatRimWidth(e, mask, W, height, initial, widthPrior) {
     if (e.b >= 0.07 * e.a) return;
+    // Refined backdrop pixels can widen a flat top far beyond the vessel. Confirm
+    // that growth against several rows inside the upper body before keeping it.
+    if (initial && e.a > 1.25 * initial.a) {
+      var centers = [], radii = [];
+      for (var row = 0; row < 7; row++) {
+        var body = rowSpan(mask, W, Math.round(e.yc + height * (0.06 + 0.01 * row)));
+        if (body) { centers.push((body.l + body.r) / 2); radii.push((body.r - body.l) / 2); }
+      }
+      var radius = median(radii);
+      // If the entire upper body has leaked into the backdrop, its width cannot
+      // validate the rim. Retain the initial rim's ends without changing its height.
+      if (widthPrior && e.a > 1.5 * initial.a && initial.a > 0.1 * W && Math.abs(e.xc - initial.xc) < 0.25 * initial.a) {
+        e.xc = initial.xc; e.a = initial.a; return;
+      }
+      if (radii.length >= 5 && radius > 0.85 * initial.a && radius < 1.2 * initial.a && e.a > 1.2 * radius) {
+        e.xc = median(centers); e.a = radius; return;
+      }
+    }
     // A nearly flat rim can cross a row where the mask clips a pale or thin lip.
     // Use several rows just inside the body to recover the ends, with a bounded expansion.
     var left = [], right = [];
@@ -369,7 +405,7 @@ var RIM2 = (function () {
 
   // A flat but tilted lip cannot pass the axis-aligned arc residual check.
   // Recover a coherent local line, keeping its width and rejecting painted-band jumps.
-  function refineTiltedLip(cv, e, height) {
+  function refineTiltedLip(cv, e, height, minSupport) {
     if (e.b > 0.03 * e.a) return;
     var blur = Math.max(1, Math.round(cv.width / WORK)), reach = 0.035 * height;
     var y0 = Math.max(0, Math.floor(e.yc - reach - blur - 1));
@@ -382,6 +418,15 @@ var RIM2 = (function () {
     }
     if (pts.length < 20) return;
     var active = pts.slice(), yc, tilt;
+    if (minSupport < 20) {
+      // A few painted-band peaks can bias least squares before outlier rejection.
+      var slopes = [];
+      for (var l = 0; l < pts.length; l++) for (var r = l + 1; r < pts.length; r++) {
+        if (pts[r].x - pts[l].x > 0.4 * e.a) slopes.push((pts[r].y - pts[l].y) / (pts[r].x - pts[l].x));
+      }
+      tilt = median(slopes); yc = median(pts.map(function (p) { return p.y - tilt * p.x; }));
+      active = pts.filter(function (p) { return Math.abs(p.y - yc - tilt * p.x) < 2 * blur; });
+    }
     for (var it = 0; it < 3; it++) {
       if (active.length < 18) return;
       var sx = 0, sy = 0, sxx = 0, sxy = 0, n = active.length;
@@ -389,7 +434,8 @@ var RIM2 = (function () {
       tilt = (n * sxy - sx * sy) / (n * sxx - sx * sx); yc = (sy - tilt * sx) / n;
       active = active.filter(function (p) { return Math.abs(p.y - yc - tilt * p.x) < 2 * blur; });
     }
-    if (active.length < 20 || Math.abs(tilt) < 0.015 || Math.abs(tilt) > 0.15 || Math.abs(yc - e.yc) > reach) return;
+    if (active.length < minSupport || Math.abs(tilt) < 0.015 || Math.abs(tilt) > 0.15 || Math.abs(yc - e.yc) > reach) return;
+    if (active.length < 20 && (active[0].x > -0.5 * e.a || active[active.length - 1].x < 0.5 * e.a)) return;
     e.yc = yc; e.b = 0; e.tilt = tilt;
   }
 
@@ -425,6 +471,113 @@ var RIM2 = (function () {
     return { xc: xc, a: a, yc: fit.yc, b: fit.b };
   }
 
+  // Confirm a suspicious base against the image: trace the two side generators,
+  // then search a small ellipse family where they end. Floor-colour support below
+  // the arc penalizes painted bands that still have vessel material underneath.
+  function refineImageBase(S, mask, top, e, yMin, yMax, trustedTop) {
+    var W = S.W, H = S.H, d = S.d, height = yMax - yMin;
+    if (height < 50 || top.a < 15) return e;
+    function gx(x, y) {
+      x = Math.round(x); y = Math.round(y);
+      if (x < 2 || x >= W - 2 || y < 0 || y >= H) return 0;
+      var p = 4 * (y * W + x - 2), q = p + 16;
+      return Math.hypot(d[p]-d[q], d[p+1]-d[q+1], d[p+2]-d[q+2]);
+    }
+    var mid = yMin + 0.55 * height, samples = [];
+    for (var i = 0; i < 21; i++) samples.push(yMin + height * (0.4 + i * 0.015));
+    function wall(target) {
+      var best = null, bestScore = 0;
+      for (var x = Math.max(3, Math.round(target - 0.4 * top.a)); x <= Math.min(W - 4, target + 0.4 * top.a); x++) {
+        for (var slope = -0.16; slope <= 0.161; slope += 0.02) {
+          var values = samples.map(function (y) { return gx(x + slope * (y - mid), y); }).sort(function (a,b) { return a-b; });
+          var score = values[5];
+          if (score > bestScore) { bestScore = score; best = { x: x, slope: slope, score: score }; }
+        }
+      }
+      return bestScore > 15 ? best : null;
+    }
+    var left = wall(top.xc - top.a), right = wall(top.xc + top.a);
+    var haveWalls = left && right && right.x - left.x >= top.a;
+    if (!haveWalls) { left = {x:top.xc-top.a,slope:0,score:0}; right = {x:top.xc+top.a,slope:0,score:0}; }
+    function wallX(w, y) { return w.x + w.slope * (y - mid); }
+    function end(w) {
+      var step = Math.max(3, Math.round(0.025 * height)), best = null, drop = 0;
+      for (var y = Math.round(yMin + 0.6 * height); y < Math.min(H-step-1, yMax); y++) {
+        var before = [], after = [];
+        for (var j = 2; j <= step; j++) { before.push(gx(wallX(w,y-j),y-j)); after.push(gx(wallX(w,y+j),y+j)); }
+        var a = median(before), b = median(after);
+        if (a > Math.max(15, 0.4*w.score) && b < 0.4*a && a-b > drop) { best = y; drop = a-b; }
+      }
+      return best;
+    }
+    var yl = haveWalls ? end(left) : null, yr = haveWalls ? end(right) : null;
+    function floorDistance(x, y) {
+      y = Math.min(H-1,Math.round(y));
+      var o = 4*(y*W+x);
+      var l = Math.max(0,Math.round(Math.min(wallX(left,y),top.xc-top.a)-0.12*top.a));
+      var r = Math.min(W-1,Math.round(Math.max(wallX(right,y),top.xc+top.a)+0.12*top.a));
+      var li = 4*(y*W+l), ri = 4*(y*W+r), t = (x-l)/(r-l);
+      var br = d[li]+t*(d[ri]-d[li]), bg = d[li+1]+t*(d[ri+1]-d[li+1]), bb = d[li+2]+t*(d[ri+2]-d[li+2]);
+      var scale = Math.max(0.25,Math.min(1.5,(d[o]*br+d[o+1]*bg+d[o+2]*bb)/(br*br+bg*bg+bb*bb+1)));
+      return Math.hypot(d[o]-scale*br,d[o+1]-scale*bg,d[o+2]-scale*bb);
+    }
+    function quality(xc, a, yc, b, balanced) {
+      var values = [], floor = [[],[],[]];
+      for (var i = -9; i <= 9; i++) {
+        var u = i/10, x = Math.round(xc+a*u), y = Math.round(yc+b*Math.sqrt(1-u*u));
+        if (x < 0 || x >= W || y < 2 || y >= H-4) return 0;
+        var p = 4*((y-2)*W+x), q = 4*((y+2)*W+x), distance = floorDistance(x,y+3);
+        for (var layer = 0; layer < 3; layer++) floor[layer].push(floorDistance(x,y+(0.03+0.035*layer)*height));
+        values.push(Math.hypot(d[p]-d[q],d[p+1]-d[q+1],d[p+2]-d[q+2])/(1+distance/20));
+      }
+      if (!floor.every(function (row) { return median(row) < 20; })) return 0;
+      return balanced ? Math.min(median(values),median(values.slice(0,5)),median(values.slice(-5))) : median(values);
+    }
+    var oldScore = quality(e.xc,e.a,e.yc,e.b), best = null, score = Math.max(20,1.5*oldScore+5);
+    var center = (yl+yr)/2;
+    if (yl !== null && yr !== null && Math.abs(yl-yr) <= 0.08*height) for (var yc = Math.max(yMin+0.55*height,Math.round(center-0.04*height)); yc <= center+0.04*height; yc += 2) {
+      var xl = wallX(left,yc), xr = wallX(right,yc), a = (xr-xl)/2, xc = (xl+xr)/2;
+      if (a < 0.6*e.a || a > 1.6*e.a) continue;
+      // A narrower proposal should not move farther from the shared rim radius.
+      if (a < 0.95*e.a && Math.abs(a-top.a) > Math.abs(e.a-top.a)+0.05*top.a) continue;
+      for (var b = 2; b <= 0.6*a; b += 2) {
+        var front = yc+b, oldFront = e.yc+e.b;
+        if (!(front < oldFront-0.03*height || ((a < 0.85*e.a || a > 1.15*e.a) && Math.abs(front-oldFront) < 0.06*height))) continue;
+        var s = quality(xc,a,yc,b);
+        if (s > score) { score = s; best = { xc:xc, a:a, yc:yc, b:b }; }
+      }
+    }
+    // When the base height is already good, fit width/axis locally with that
+    // front height anchored. Require image support at both outer arc sectors.
+    if (trustedTop) {
+      var centers = [], radii = [];
+      for (var i = 0; i < 9; i++) {
+        var span = rowSpan(mask,W,Math.round(yMin+height*(0.7+0.02*i)));
+        if (span) { centers.push((span.l+span.r)/2); radii.push((span.r-span.l)/2); }
+      }
+      var radius = median(radii), axis = median(centers);
+      if (radii.length >= 7 && radius > 0.7*e.a && radius < 1.5*e.a &&
+          (Math.abs(e.xc-top.xc) > 0.1*top.a || Math.abs(radius-e.a) > 0.1*radius)) {
+        var localBest = null, localScore = Math.max(20,1.5*quality(e.xc,e.a,e.yc,e.b,true)+5);
+        // A shallow inner-foot fit can match the central edge but miss the rim ends.
+        // With a clearly open top, confirm a base around the body's full width.
+        var shallow = e.b/e.a < 0.8*top.b/top.a && Math.abs(e.xc-top.xc) < 0.2*top.a;
+        var axes = [e.xc,axis,top.xc], widths = shallow ? [0.95*radius,radius,1.05*radius] : [e.a,0.9*radius,radius,1.1*radius];
+        axes.forEach(function (xc) { widths.forEach(function (a) {
+          for (var shift = -1; shift <= 1; shift++) for (var b = 2; b <= 0.5*a; b += 2) {
+            if (shallow && b/a < top.b/top.a) continue;
+            var yc = e.yc+e.b+shift*0.015*height-b, s = quality(xc,a,yc,b,true);
+            if (s > localScore) { localScore = s; localBest = {xc:xc,a:a,yc:yc,b:b}; }
+          }
+        }); });
+        // Do not trade a confirmed side-generator width for a central-arc fit.
+        if (localBest && (!best || (localScore > quality(best.xc,best.a,best.yc,best.b,true) &&
+            Math.abs(localBest.a-top.a) <= Math.abs(best.a-top.a)+0.05*top.a))) best = localBest;
+      }
+    }
+    return best || e;
+  }
+
   function detect(cv, opts) {
     opts = opts || {};
     var S = small(cv), mask = silhouette(S), initial = fitFromMask(mask, S.W, S.H);
@@ -433,7 +586,7 @@ var RIM2 = (function () {
     var fixBase = opts.twoClass !== false && opts.trimShadows !== false;
     var recoverBase = fixBase && initial.bot && initial.bot.b < 2 && initial.yMax < 0.85 * S.H;
     if (opts.twoClass !== false) mask = refineMask(S, mask, recoverBase);
-    if (fixBase) mask = trimShadowShelf(mask, S.W, S.H);
+    if (fixBase) mask = trimShadowShelf(mask, S.W, S.H, opts.trimNecks !== false, initial.yMax - 0.04 * (initial.yMax - initial.yMin));
     var f = fitFromMask(mask, S.W, S.H), top = f.top, bot = f.bot;
     // Preserve a similarly wide, rounded base when refinement grows far into the floor below it.
     if (fixBase && initial.bot && bot && initial.bot.b > 3 && initial.bot.a >= 0.85 * bot.a &&
@@ -442,24 +595,35 @@ var RIM2 = (function () {
     }
     if (!top || !bot) return null;
     // A small refinement artifact can pull the top fit onto a narrow, flat row.
-    // Preserve a curved initial opening when both its width and curvature collapse.
-    if (opts.stableTop !== false && initial.top && top.a < 0.85 * initial.top.a &&
-        initial.top.b > 0.06 * initial.top.a && top.b < 0.03 * top.a) top = initial.top;
+    // Preserve a curved initial opening if a flat fit loses width or jumps above its back rim.
+    if (opts.stableTop !== false && initial.top && initial.top.b > 0.06 * initial.top.a && top.b < 0.03 * top.a &&
+        (top.a < 0.85 * initial.top.a || (opts.browserFixes !== false && top.a <= 1.25 * initial.top.a && top.yc + top.b < initial.top.yc - 0.25 * initial.top.b))) top = initial.top;
+    var refine = opts.twoClass !== false && opts.refineRims !== false;
+    var height = f.yMax - f.yMin;
+    if (refine) recoverFlatRimWidth(top, mask, S.W, height, opts.browserFixes === false ? null : initial.top, opts.rimWidthPrior !== false);
     var bottomLimit = f.yMax;
     if (fixBase && opts.recoverBaseCurve !== false) {
       var recovered = recoverBaseCurve(mask, S.W, S.H, bot, f.yMin, f.yMax);
       if (recovered !== bot) bottomLimit = Math.min(S.H - 1, recovered.yc + recovered.b);
       bot = recovered;
     }
+    // Reject a base widened by background leakage when the initial rounded base
+    // agrees with the recovered top width and reaches the same bottom region.
+    if (fixBase && opts.consistentBase !== false && initial.bot && initial.bot.b > 3 &&
+        bot.a > 1.2*top.a && initial.bot.a > 0.85*top.a && initial.bot.a < 1.15*top.a &&
+        Math.abs(initial.bot.yc+initial.bot.b-bot.yc-bot.b) < 0.08*height) {
+      bot = initial.bot; bottomLimit = Math.min(S.H-1,bot.yc+bot.b);
+    }
+    if (fixBase && opts.imageBase !== false) {
+      var confirmed = refineImageBase(S, mask, top, bot, f.yMin, f.yMax, initial.top && Math.abs(top.xc-initial.top.xc) < 0.25*initial.top.a);
+      if (confirmed !== bot) { bot = confirmed; bottomLimit = Math.min(S.H - 1, bot.yc + bot.b); }
+    }
     // Front arc of the top rim bows down (camera above the rim), as in museum/product photos.
     // A perspective-based above/below guess was tried and lost on hand-labelled photos (3.9% vs 1.1%).
     top.s = opts.topDir || 1;
-    var refine = opts.twoClass !== false && opts.refineRims !== false;
-    var height = f.yMax - f.yMin;
-    if (refine) recoverFlatRimWidth(top, mask, S.W, height);
     top = scaleE(top, S.sc);
     if (refine && top.s === 1) refineFrontRim(cv, top, height / S.sc);
-    if (refine && opts.tiltedLip !== false) refineTiltedLip(cv, top, height / S.sc);
+    if (refine && opts.tiltedLip !== false) refineTiltedLip(cv, top, height / S.sc, opts.browserFixes === false ? 20 : 18);
     return toB(top, scaleE(bot, S.sc), f.yMin / S.sc, bottomLimit / S.sc);
   }
 
