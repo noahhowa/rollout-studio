@@ -53,20 +53,6 @@ function renderAdjust() {
   prevBtn.textContent = t("preview");
   prevBtn.onclick = previewStrips;
   el.appendChild(prevBtn);
-  var ccBtn = document.createElement("button");
-  ccBtn.className = "btn btn-outline";
-  ccBtn.style.cssText = "margin-top:12px;margin-left:8px";
-  ccBtn.textContent = t("checkOverlap");
-  ccBtn.onclick = function () {
-    var note = document.getElementById("cropNote");
-    note.textContent = t("checking");
-    setTimeout(function () { showCropCheck(note); }, 30); // let the note paint before the check
-  };
-  el.appendChild(ccBtn);
-  var ccNote = document.createElement("div");
-  ccNote.className = "meta";
-  ccNote.id = "cropNote";
-  el.appendChild(ccNote);
   var pw = document.createElement("div");
   pw.className = "preview-bar";
   pw.id = "prevWrap";
@@ -277,32 +263,25 @@ function previewStrips() {
   document.getElementById("prevMeta").textContent =
     strips.length + " " + t("strips") + " \u00B7 " + totalW + " \u00D7 " + maxH + " px";
 }
-// Overlap-aware crop check: a suggestion only. Applies wider crops only when the user clicks.
-function showCropCheck(note) {
+// Overlap check before Stitch (runs automatically when leaving Adjust). If neighbouring photos
+// barely overlap, a friendly dialog explains it and offers the wider-crop fix; the user can
+// always stitch anyway. Crops change only if the user picks that option.
+function overlapGate(proceed) {
   var res;
-  try { res = CROPCHECK.check(null); } catch (e) { note.textContent = "\u2717 " + e.message; return; }
+  try { res = CROPCHECK.check(null); } catch (e) { proceed(); return; } // never block Stitch on a check error
   var weak = res.joins.filter(function (j) { return j.current.weak; });
-  note.innerHTML = "";
-  if (!weak.length) { note.textContent = t("overlapOk"); return; }
-  weak.forEach(function (j) {
-    var line = document.createElement("div"), pair = (j.a + 1) + " \u2013 " + (j.b + 1);
-    var fixed = j.fallback && !j.fallback.weak;
-    line.textContent = (fixed ? t("overlapWeak") : j.manual ? t("overlapManual") : t("overlapNone")).replace("{pair}", pair);
-    note.appendChild(line);
+  if (!weak.length) { proceed(); return; }
+  var lines = weak.map(function (j) {
+    var pair = (j.a + 1) + " \u2013 " + (j.b + 1), fixed = j.fallback && !j.fallback.weak;
+    return (fixed ? t("overlapWeak") : j.manual ? t("overlapManual") : t("overlapNone")).replace("{pair}", pair);
   });
-  if (res.suggestion) {
-    var btn = document.createElement("button");
-    btn.className = "btn btn-outline";
-    btn.style.marginTop = "8px";
-    btn.textContent = t("applyWiderCrop");
-    btn.onclick = function () {
-      res.suggestion.forEach(function (c) {
-        if (c.cropL != null) imgs[c.i].cropL = c.cropL;
-        if (c.cropR != null) imgs[c.i].cropR = c.cropR;
-      });
-      renderAdjust();
-      var n = document.getElementById("cropNote"); if (n) n.textContent = t("widerCropApplied");
-    };
-    note.appendChild(btn);
-  }
+  var actions = [{ label: t("modalCancel"), cls: "btn-ghost" }, { label: t("stitchAnyway"), cls: res.suggestion ? "btn-outline" : "btn-dark", onClick: proceed }];
+  if (res.suggestion) actions.push({ label: t("applyWiderCrop"), cls: "btn-dark", onClick: function () {
+    res.suggestion.forEach(function (c) {
+      if (c.cropL != null) imgs[c.i].cropL = c.cropL;
+      if (c.cropR != null) imgs[c.i].cropR = c.cropR;
+    });
+    proceed();
+  } });
+  showChoice({ title: t("overlapTitle"), lines: lines, note: t("overlapNote"), actions: actions });
 }
