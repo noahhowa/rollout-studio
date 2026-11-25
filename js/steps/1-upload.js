@@ -8,6 +8,67 @@ fi.onchange = function (e) {
 // Photos keep the order they were selected in. Files load asynchronously and finish in any order
 // (large files later), so each gets a sequence number and is inserted in sequence, not on arrival.
 var uploadSeq = 0;
+// ═══ TIFF support (decoder loaded lazily, pinned versions) ═══
+function isTiff(f) {
+  return /\.tiff?$/i.test(f.name) || f.type === "image/tiff";
+}
+var tiffLibs = null;
+function loadScript(src) {
+  return new Promise(function (ok, no) {
+    var s = document.createElement("script");
+    s.src = src;
+    s.onload = ok;
+    s.onerror = function () { no(new Error("could not load " + src)); };
+    document.head.appendChild(s);
+  });
+}
+function loadTiffLib() {
+  if (window.UTIF) return Promise.resolve();
+  if (!tiffLibs) {
+    // pako is only needed for Deflate-compressed TIFFs, so its failure is not fatal.
+    tiffLibs = loadScript("https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js")
+      .catch(function () {})
+      .then(function () { return loadScript("https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"); })
+      .catch(function (e) { tiffLibs = null; throw e; });
+  }
+  return tiffLibs;
+}
+// Decode the first TIFF page to a PNG data URL (8/16-bit RGB(A) and greyscale as UTIF supports).
+function tiffToDataURL(buf) {
+  return loadTiffLib().then(function () {
+    var ifds = UTIF.decode(buf);
+    if (!ifds.length) throw new Error("empty TIFF");
+    UTIF.decodeImage(buf, ifds[0]);
+    var pg = ifds[0], w = pg.width, h = pg.height;
+    if (!w || !h || !pg.data || !pg.data.length) throw new Error("unsupported TIFF");
+    var rgba = new Uint8ClampedArray(UTIF.toRGBA8(pg));
+    if (rgba.length !== w * h * 4) throw new Error("unsupported TIFF");
+    var c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    c.getContext("2d").putImageData(new ImageData(rgba, w, h), 0, 0);
+    return c.toDataURL("image/png");
+  });
+}
+// Upload progress: one entry per file until its thumbnail appears. TIFFs can take seconds
+// (decoder download on first use, full-size decode), so each file shows its current stage.
+var pendingUploads = [];
+function setPending(seq, name, stage) {
+  var p = pendingUploads.filter(function (x) { return x.seq === seq; })[0];
+  if (stage == null) pendingUploads = pendingUploads.filter(function (x) { return x.seq !== seq; });
+  else if (p) p.stage = stage;
+  else pendingUploads.push({ seq: seq, name: name, stage: stage });
+  updateUploadStatus();
+}
+function updateUploadStatus() {
+  var el = document.getElementById("upStatus");
+  if (el) {
+    el.style.display = pendingUploads.length ? "flex" : "none";
+    el.querySelector(".up-text").textContent = pendingUploads.map(function (p) { return p.name + ": " + t(p.stage); }).join(" \u00B7 ");
+  }
+  var nb = document.getElementById("btnNext");
+  if (nb) nb.disabled = imgs.length < 2 || pendingUploads.length > 0;
+}
 function doFiles(fs) {
   Array.from(fs).forEach(function (f) {
     if (/\.json$/i.test(f.name)) {
@@ -15,15 +76,42 @@ function doFiles(fs) {
       return;
     }
     var seq = uploadSeq++, r = new FileReader();
+    setPending(seq, f.name, "upReading");
+    // TIFF: most browsers can't decode it in <img>, so decode with UTIF.js into a PNG data URL
+    // (also keeps sessions reloadable anywhere), then continue down the normal loadSrc path.
+    if (isTiff(f)) {
+      r.onload = function (e) {
+        var buf = e.target.result;
+        setPending(seq, f.name, window.UTIF ? "upDecoding" : "upDecoder");
+        loadTiffLib().then(function () {
+          setPending(seq, f.name, "upDecoding");
+          return new Promise(function (res) { setTimeout(res, 30); }); // let the status paint
+        }).then(function () { return tiffToDataURL(buf); }).then(function (u) {
+          loadSrc(u, seq, f.name);
+        }, function (err) {
+          setPending(seq, null, null);
+          alert(t("tiffFailed") + f.name + " (" + (err && err.message || err) + ")");
+        });
+      };
+      r.onerror = function () { setPending(seq, null, null); alert(t("loadFailed") + f.name); };
+      r.readAsArrayBuffer(f);
+      return;
+    }
     r.onload = function (e) {
-      loadSrc(e.target.result, seq);
+      loadSrc(e.target.result, seq, f.name);
     };
+    r.onerror = function () { setPending(seq, null, null); alert(t("loadFailed") + f.name); };
     r.readAsDataURL(f);
   });
 }
-function loadSrc(src, seq) {
+function loadSrc(src, seq, name) {
   var im = new Image();
+  im.onerror = function () { if (seq != null) setPending(seq, null, null); alert(t("loadFailed") + (name || "")); };
   im.onload = function () {
+    if (seq != null && name) { setPending(seq, name, "upRims"); setTimeout(place, 30); } // paint before the sync detection
+    else place();
+  };
+  function place() {
     var sc = Math.min(1, 1200 / im.width),
       c = document.createElement("canvas");
     c.width = Math.round(im.width * sc);
@@ -41,10 +129,11 @@ function loadSrc(src, seq) {
     while (at > 0 && imgs[at - 1].seq != null && imgs[at - 1].seq > entry.seq) at--;
     imgs.splice(at, 0, entry);
     stripCache = [];
+    if (seq != null) pendingUploads = pendingUploads.filter(function (x) { return x.seq !== seq; });
     renderUpload();
-    document.getElementById("btnNext").disabled = imgs.length < 2;
+    updateUploadStatus();
     document.getElementById("hint").textContent = imgs.length > 0 && imgs.length < 2 ? t("addMin") : "";
-  };
+  }
   im.src = src;
 }
 function saveSession() {
@@ -167,6 +256,13 @@ function renderUpload() {
     doFiles(e.dataTransfer.files);
   };
   el.appendChild(dz);
+  var st = document.createElement("div");
+  st.id = "upStatus";
+  st.className = "up-status";
+  st.setAttribute("role", "status");
+  st.setAttribute("aria-live", "polite");
+  st.innerHTML = '<div class="spinner"></div><span class="up-text"></span>';
+  el.appendChild(st);
   if (imgs.length) {
     var grid = document.createElement("div");
     grid.className = "thumb-grid";
