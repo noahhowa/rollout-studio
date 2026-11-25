@@ -289,9 +289,9 @@ function overlapGate(proceed) {
   showChoice({ title: t("overlapTitle"), lines: lines, note: t("overlapNote"), actions: actions });
 }
 // Auto-sort by overlap, once per set of photos: place the strips from their pairwise overlaps
-// (SEAMMERGE.place) and reorder them left to right when that's confident (every neighbour in the
-// new order overlaps directly) and differs from the current order other than by starting photo or
-// direction. A notice shows the change with Undo; manual arrows always win.
+// (SEAMMERGE.place) and reorder them left to right when the current order has a neighbour pair
+// that doesn't overlap and the new order is a chain of direct overlaps. A notice shows the
+// change with Undo; manual arrows always win.
 function sortKey() { return imgs.map(function (im) { return im.seq; }).slice().sort(function (a, b) { return a - b; }).join(","); }
 function autoSortByOverlap() {
   if (imgs.length < 3 || autoSort.key === sortKey() || cur !== 2) return;
@@ -302,24 +302,18 @@ function autoSortByOverlap() {
     try { pl = SEAMMERGE.place(buildRawStrips()); } catch (e) { pl = { error: e.message }; }
     autoSort.checking = false;
     var order = pl.order, n = imgs.length;
-    var direct = order && order.every(function (q, k) {
-      return k === 0 || pl.edges.some(function (e) { return (e.i === q && e.j === order[k - 1]) || (e.j === q && e.i === order[k - 1]); });
-    });
-    if (pl.error || !direct || sameCycle(order)) { renderSortNote(); return; }
+    function linked(a, b) { return pl.edges.some(function (e) { return (e.i === a && e.j === b) || (e.j === a && e.i === b); }); }
+    function chain(o) { return o.every(function (q, k) { return k === 0 || linked(o[k - 1], q); }); }
+    // The stitcher joins photos as a chain, so an order is fine when every neighbour overlaps
+    // directly. Keep the user's order if it already is; otherwise use the overlap order, if it is.
+    var current = imgs.map(function (_, i) { return i; });
+    if (pl.error || !chain(order) || chain(current)) { renderSortNote(); return; }
     autoSort.prev = imgs.map(function (im) { return im.seq; });
     autoSort.order = order.map(function (q) { return q + 1; });
     var im2 = order.map(function (q) { return imgs[q]; }), sc2 = stripCache.length === n ? order.map(function (q) { return stripCache[q]; }) : [];
     imgs = im2; stripCache = sc2;
     if (cur === 2) renderAdjust();
   }, 30);
-}
-function sameCycle(order) { // already in sequence round the vessel (any start, either direction)?
-  var n = order.length, pos = order.indexOf(0), fwd = true, bwd = true;
-  for (var j = 0; j < n; j++) {
-    if (order[(pos + j) % n] !== j) fwd = false;
-    if (order[(pos - j + n) % n] !== j) bwd = false;
-  }
-  return fwd || bwd;
 }
 function renderSortNote() {
   var el = document.getElementById("sortNote");
