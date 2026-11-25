@@ -60,7 +60,16 @@ function go(n) {
   if (n === 4) renderRefine();
 }
 document.getElementById("btnNext").onclick = function () {
-  go(cur + 1);
+  if (cur !== 2) { go(cur + 1); return; }
+  // Leaving Adjust: check overlaps first (about a second), showing that something is happening.
+  var nb = this, label = nb.innerHTML;
+  nb.disabled = true;
+  nb.textContent = t("checking");
+  setTimeout(function () {
+    overlapGate(function () { go(3); });
+    nb.disabled = false;
+    nb.innerHTML = label;
+  }, 30);
 };
 document.getElementById("btnBack").onclick = function () {
   go(cur - 1);

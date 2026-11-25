@@ -4,6 +4,12 @@
 function renderAdjust() {
   var el = document.getElementById("p2");
   el.innerHTML = "<h1>" + t("adjustStrips") + "</h1>";
+  var sortNote = document.createElement("div");
+  sortNote.id = "sortNote";
+  sortNote.className = "sort-note";
+  sortNote.setAttribute("role", "status");
+  el.appendChild(sortNote);
+  renderSortNote();
   var card = document.createElement("div");
   card.className = "card card-pad";
   var sr = document.createElement("div");
@@ -18,12 +24,6 @@ function renderAdjust() {
     feather +
     "%</span>";
   card.appendChild(sr);
-  var chk = document.createElement("div");
-  chk.className = "chk-row";
-  chk.innerHTML =
-    '<input type="checkbox" id="autoOrderToggle"' + (autoOrderOn ? " checked" : "") + '><label for="autoOrderToggle">' + t("autoOrder") + "</label>";
-  chk.querySelector("input").onchange = function () { autoOrderOn = this.checked; };
-  card.appendChild(chk);
   var wchk = document.createElement("div");
   wchk.className = "chk-row";
   wchk.innerHTML =
@@ -53,20 +53,6 @@ function renderAdjust() {
   prevBtn.textContent = t("preview");
   prevBtn.onclick = previewStrips;
   el.appendChild(prevBtn);
-  var ccBtn = document.createElement("button");
-  ccBtn.className = "btn btn-outline";
-  ccBtn.style.cssText = "margin-top:12px;margin-left:8px";
-  ccBtn.textContent = t("checkOverlap");
-  ccBtn.onclick = function () {
-    var note = document.getElementById("cropNote");
-    note.textContent = t("checking");
-    setTimeout(function () { showCropCheck(note); }, 30); // let the note paint before the check
-  };
-  el.appendChild(ccBtn);
-  var ccNote = document.createElement("div");
-  ccNote.className = "meta";
-  ccNote.id = "cropNote";
-  el.appendChild(ccNote);
   var pw = document.createElement("div");
   pw.className = "preview-bar";
   pw.id = "prevWrap";
@@ -76,6 +62,7 @@ function renderAdjust() {
   meta.className = "meta";
   meta.id = "prevMeta";
   el.appendChild(meta);
+  if (imgs.length >= 3 && autoSort.key !== sortKey()) setTimeout(autoSortByOverlap, 30); // after the page paints
   setTimeout(function () {
     var fsl = document.getElementById("fsl");
     if (fsl)
@@ -123,6 +110,7 @@ function makeCropCard(im, idx) {
       var tc = stripCache[idx];
       stripCache[idx] = stripCache[idx - 1];
       stripCache[idx - 1] = tc;
+      autoSort.order = null;
       renderAdjust();
     }
   };
@@ -138,6 +126,7 @@ function makeCropCard(im, idx) {
       var tc = stripCache[idx];
       stripCache[idx] = stripCache[idx + 1];
       stripCache[idx + 1] = tc;
+      autoSort.order = null;
       renderAdjust();
     }
   };
@@ -277,32 +266,79 @@ function previewStrips() {
   document.getElementById("prevMeta").textContent =
     strips.length + " " + t("strips") + " \u00B7 " + totalW + " \u00D7 " + maxH + " px";
 }
-// Overlap-aware crop check: a suggestion only. Applies wider crops only when the user clicks.
-function showCropCheck(note) {
+// Overlap check before Stitch (runs automatically when leaving Adjust). If neighbouring photos
+// barely overlap, a friendly dialog explains it and offers the wider-crop fix; the user can
+// always stitch anyway. Crops change only if the user picks that option.
+function overlapGate(proceed) {
   var res;
-  try { res = CROPCHECK.check(null); } catch (e) { note.textContent = "\u2717 " + e.message; return; }
+  try { res = CROPCHECK.check(null); } catch (e) { proceed(); return; } // never block Stitch on a check error
   var weak = res.joins.filter(function (j) { return j.current.weak; });
-  note.innerHTML = "";
-  if (!weak.length) { note.textContent = t("overlapOk"); return; }
-  weak.forEach(function (j) {
-    var line = document.createElement("div"), pair = (j.a + 1) + " \u2013 " + (j.b + 1);
-    var fixed = j.fallback && !j.fallback.weak;
-    line.textContent = (fixed ? t("overlapWeak") : j.manual ? t("overlapManual") : t("overlapNone")).replace("{pair}", pair);
-    note.appendChild(line);
+  if (!weak.length) { proceed(); return; }
+  var lines = weak.map(function (j) {
+    var pair = (j.a + 1) + " \u2013 " + (j.b + 1), fixed = j.fallback && !j.fallback.weak;
+    return (fixed ? t("overlapWeak") : j.manual ? t("overlapManual") : t("overlapNone")).replace("{pair}", pair);
   });
-  if (res.suggestion) {
-    var btn = document.createElement("button");
-    btn.className = "btn btn-outline";
-    btn.style.marginTop = "8px";
-    btn.textContent = t("applyWiderCrop");
-    btn.onclick = function () {
-      res.suggestion.forEach(function (c) {
-        if (c.cropL != null) imgs[c.i].cropL = c.cropL;
-        if (c.cropR != null) imgs[c.i].cropR = c.cropR;
-      });
-      renderAdjust();
-      var n = document.getElementById("cropNote"); if (n) n.textContent = t("widerCropApplied");
-    };
-    note.appendChild(btn);
+  var actions = [{ label: t("modalCancel"), cls: "btn-ghost" }, { label: t("stitchAnyway"), cls: res.suggestion ? "btn-outline" : "btn-dark", onClick: proceed }];
+  if (res.suggestion) actions.push({ label: t("applyWiderCrop"), cls: "btn-dark", onClick: function () {
+    res.suggestion.forEach(function (c) {
+      if (c.cropL != null) imgs[c.i].cropL = c.cropL;
+      if (c.cropR != null) imgs[c.i].cropR = c.cropR;
+    });
+    proceed();
+  } });
+  showChoice({ title: t("overlapTitle"), lines: lines, note: t("overlapNote"), actions: actions });
+}
+// Auto-sort by overlap, once per set of photos: place the strips from their pairwise overlaps
+// (SEAMMERGE.place) and reorder them left to right when that's confident (every neighbour in the
+// new order overlaps directly) and differs from the current order other than by starting photo or
+// direction. A notice shows the change with Undo; manual arrows always win.
+function sortKey() { return imgs.map(function (im) { return im.seq; }).slice().sort(function (a, b) { return a - b; }).join(","); }
+function autoSortByOverlap() {
+  if (imgs.length < 3 || autoSort.key === sortKey() || cur !== 2) return;
+  autoSort = { key: sortKey(), order: null, prev: null, checking: true };
+  renderSortNote();
+  setTimeout(function () {
+    var pl;
+    try { pl = SEAMMERGE.place(buildRawStrips()); } catch (e) { pl = { error: e.message }; }
+    autoSort.checking = false;
+    var order = pl.order, n = imgs.length;
+    var direct = order && order.every(function (q, k) {
+      return k === 0 || pl.edges.some(function (e) { return (e.i === q && e.j === order[k - 1]) || (e.j === q && e.i === order[k - 1]); });
+    });
+    if (pl.error || !direct || sameCycle(order)) { renderSortNote(); return; }
+    autoSort.prev = imgs.map(function (im) { return im.seq; });
+    autoSort.order = order.map(function (q) { return q + 1; });
+    var im2 = order.map(function (q) { return imgs[q]; }), sc2 = stripCache.length === n ? order.map(function (q) { return stripCache[q]; }) : [];
+    imgs = im2; stripCache = sc2;
+    if (cur === 2) renderAdjust();
+  }, 30);
+}
+function sameCycle(order) { // already in sequence round the vessel (any start, either direction)?
+  var n = order.length, pos = order.indexOf(0), fwd = true, bwd = true;
+  for (var j = 0; j < n; j++) {
+    if (order[(pos + j) % n] !== j) fwd = false;
+    if (order[(pos - j + n) % n] !== j) bwd = false;
   }
+  return fwd || bwd;
+}
+function renderSortNote() {
+  var el = document.getElementById("sortNote");
+  if (!el) return;
+  el.innerHTML = "";
+  if (autoSort.checking) { el.innerHTML = '<div class="spinner"></div>'; el.appendChild(document.createTextNode(t("sortChecking"))); el.style.display = "flex"; return; }
+  if (!autoSort.order) { el.style.display = "none"; return; }
+  el.style.display = "flex";
+  el.appendChild(document.createTextNode(t("sortDone")));
+  var u = document.createElement("button");
+  u.className = "link-btn";
+  u.textContent = t("undo");
+  u.onclick = function () {
+    var bySeq = {}, cs = {};
+    imgs.forEach(function (im, i) { bySeq[im.seq] = im; cs[im.seq] = stripCache[i]; });
+    imgs = autoSort.prev.map(function (q) { return bySeq[q]; });
+    stripCache = stripCache.length === imgs.length ? autoSort.prev.map(function (q) { return cs[q]; }) : [];
+    autoSort.order = null;
+    renderAdjust();
+  };
+  el.appendChild(u);
 }

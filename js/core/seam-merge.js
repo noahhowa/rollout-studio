@@ -108,9 +108,10 @@ var SEAMMERGE = (function () {
 
   // Robust (tx, s, ty) from matches; falls back to a pure shift when matches don't span the band.
   function fitPair(m, h) {
+    var MIN = MIN_INLIERS;
     var dxs = m.map(function (p) { return p[0] - p[2]; }), mdx = med(dxs);
     m = m.filter(function (p) { return Math.abs(p[0] - p[2] - mdx) <= 2; });
-    if (m.length < MIN_INLIERS) return null;
+    if (m.length < MIN) return null;
     var bs = 1, bt = med(m.map(function (p) { return p[1] - p[3]; })), bn = -1, seed = 7;
     function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
     for (var it = 0; it < 300; it++) {
@@ -123,14 +124,14 @@ var SEAMMERGE = (function () {
     }
     var inl = m.filter(function (p) { return Math.abs(bs * p[3] + bt - p[1]) < 1.5; });
     var ys = inl.map(function (p) { return p[3]; });
-    if (inl.length >= MIN_INLIERS && Math.max.apply(null, ys) - Math.min.apply(null, ys) > 0.3 * h) {
+    if (inl.length >= MIN && Math.max.apply(null, ys) - Math.min.apply(null, ys) > 0.3 * h) {
       var n2 = inl.length, sx = 0, sy = 0, sxx = 0, sxy = 0; // least-squares refit on inliers
       inl.forEach(function (p) { sx += p[3]; sy += p[1]; sxx += p[3] * p[3]; sxy += p[3] * p[1]; });
       bs = (n2 * sxy - sx * sy) / (n2 * sxx - sx * sx); bt = (sy - bs * sx) / n2;
     } else {
       bs = 1; var dyy = med(m.map(function (p) { return p[1] - p[3]; }));
       inl = m.filter(function (p) { return Math.abs(p[1] - p[3] - dyy) < 2; }); bt = med(inl.map(function (p) { return p[1] - p[3]; }));
-      if (inl.length < MIN_INLIERS) return null;
+      if (inl.length < MIN) return null;
     }
     return { tx: med(inl.map(function (p) { return p[0] - p[2]; })), s: bs, ty: bt, n: inl.length };
   }
@@ -150,7 +151,9 @@ var SEAMMERGE = (function () {
     return path;
   }
 
-  function merge(strips) {
+  // Pairwise matching + maximum spanning tree from strip 0 (order-free). pose: x_0 = x_k + X,
+  // y_0 = S * y_k + T. Returns { pose, edges, order } (order: left to right) or { error }.
+  function place(strips) {
     var n = strips.length;
     if (n < 2) return { error: "fewer than two strips" };
     var H0 = Math.max.apply(null, strips.map(function (s) { return s.height; })), k = Math.min(1, WORK_H / H0);
@@ -164,7 +167,6 @@ var SEAMMERGE = (function () {
       });
       if (f) edges.push({ i: i, j: j, tx: f.tx / k, s: f.s, ty: f.ty / k, n: f.n });
     }
-    // maximum spanning tree from strip 0; pose: x_0 = x_k + X, y_0 = S * y_k + T
     var pose = {}; pose[0] = { X: 0, S: 1, T: 0 };
     for (var placed = 1; placed < n; placed++) {
       var best = null;
@@ -177,6 +179,14 @@ var SEAMMERGE = (function () {
       else { var P2 = pose[best.j]; pose[best.i] = { X: P2.X - best.tx, S: P2.S / best.s, T: P2.T - P2.S * best.ty / best.s }; }
     }
     var order = Object.keys(pose).map(Number).sort(function (a, b) { return pose[a].X - pose[b].X; });
+    return { pose: pose, edges: edges, order: order };
+  }
+
+  function merge(strips) {
+    var n = strips.length, pl = place(strips);
+    if (pl.error) return { error: pl.error };
+    var pose = pl.pose, edges = pl.edges;
+    var order = pl.order;
     var gm = Math.exp(order.reduce(function (a, q) { return a + Math.log(pose[q].S); }, 0) / n); // keep mean height
     var X0 = pose[order[0]].X, placedS = order.map(function (q) {
       var S = pose[q].S / gm, s = strips[q];
@@ -245,6 +255,6 @@ var SEAMMERGE = (function () {
              poses: placedS.map(function (p) { return { photo: p.q + 1, x: p.x, y: p.y, scale: +(p.h / p.cv.height).toFixed(4) }; }) };
   }
 
-  return { merge: merge, params: { WORK_H: WORK_H, MIN_INLIERS: MIN_INLIERS, FEATHER: FEATHER },
+  return { merge: merge, place: place, params: { WORK_H: WORK_H, MIN_INLIERS: MIN_INLIERS, FEATHER: FEATHER },
     _internal: { gray: gray, coarse: coarse, patches: patches, fitPair: fitPair } }; // for tests
 })();

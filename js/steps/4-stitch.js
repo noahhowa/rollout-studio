@@ -156,35 +156,6 @@ function setStepState(idx, state) {
   var steps = document.querySelectorAll("#stitchSteps .p-step");
   if (steps[idx]) steps[idx].className = "p-step " + state;
 }
-/* Auto-sort: the stitching server needs photos in left-to-right order around the vessel and
-   fails otherwise. Match the photos pairwise (js/core/registration.js), solve their angles, and
-   order them by angle, starting just after the largest uncovered gap. Returns an index order, or
-   null if the photos can't be related (then the upload order is kept). */
-function autoOrder() {
-  if (typeof ROLLREGISTER === "undefined" || imgs.length < 3) return null;
-  var inputs = imgs.map(function (im) { return { cv: im.cv, b: im.b, cropL: im.cropL, cropR: im.cropR }; });
-  var reg = ROLLREGISTER.estimate(inputs);
-  if (!reg.connected) return null;
-  var a = reg.rotations.map(function (r, i) { return { i: i, r: ((r % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) }; })
-    .sort(function (p, q) { return p.r - q.r; });
-  var gapAt = 0, gap = -1;
-  for (var k = 0; k < a.length; k++) { // gap after a[k]
-    var g = (k + 1 < a.length ? a[k + 1].r : a[0].r + 2 * Math.PI) - a[k].r;
-    if (g > gap) { gap = g; gapAt = (k + 1) % a.length; }
-  }
-  var order = [];
-  for (var m = 0; m < a.length; m++) order.push(a[(gapAt + m) % a.length].i);
-  // If the upload order already goes round the vessel in sequence (any starting photo, either
-  // direction), keep it: changing only the starting photo can make the server stitch worse.
-  var n = order.length, pos = order.indexOf(0), fwd = true, bwd = true;
-  for (var j = 0; j < n; j++) {
-    if (order[(pos + j) % n] !== j) fwd = false;
-    if (order[(pos - j + n) % n] !== j) bwd = false;
-  }
-  if (fwd || bwd) return null;
-  return order;
-}
-
 /* In-browser stitching: estimate each photo's camera from its rims, register rotations from
    overlapping detail, and blend on the cylinder (js/core/camera.js, js/core/registration.js).
    Returns a canvas, or null when the photos can't be lined up reliably (caller falls back to the
@@ -253,14 +224,6 @@ async function runStitch() {
         : t("overlapWarpDeclined") + wr.declined);
     }
     await nextFrame();
-    var order = null;
-    var aot = document.getElementById("autoOrderToggle");
-    if (aot) autoOrderOn = aot.checked;
-    if (autoOrderOn) { try { order = autoOrder(); } catch (e) { order = null; } }
-    if (order && order.some(function (v, k) { return v !== k; })) {
-      strips = order.map(function (i) { return strips[i]; });
-      logMsg(t("autoSorted") + order.map(function (i) { return i + 1; }).join(", "));
-    }
     logMsg(N + " " + t("strips") + " (" + strips[0].width + "\u00D7" + strips[0].height + "px)");
     setStepState(0, "p-step done");
     setProgress(15);
