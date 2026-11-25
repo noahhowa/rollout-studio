@@ -47,6 +47,20 @@ function renderAdjust() {
   prevBtn.textContent = t("preview");
   prevBtn.onclick = previewStrips;
   el.appendChild(prevBtn);
+  var ccBtn = document.createElement("button");
+  ccBtn.className = "btn btn-outline";
+  ccBtn.style.cssText = "margin-top:12px;margin-left:8px";
+  ccBtn.textContent = t("checkOverlap");
+  ccBtn.onclick = function () {
+    var note = document.getElementById("cropNote");
+    note.textContent = t("checking");
+    setTimeout(function () { showCropCheck(note); }, 30); // let the note paint before the check
+  };
+  el.appendChild(ccBtn);
+  var ccNote = document.createElement("div");
+  ccNote.className = "meta";
+  ccNote.id = "cropNote";
+  el.appendChild(ccNote);
   var pw = document.createElement("div");
   pw.className = "preview-bar";
   pw.id = "prevWrap";
@@ -256,4 +270,33 @@ function previewStrips() {
   wrap.appendChild(cv);
   document.getElementById("prevMeta").textContent =
     strips.length + " " + t("strips") + " \u00B7 " + totalW + " \u00D7 " + maxH + " px";
+}
+// Overlap-aware crop check: a suggestion only. Applies wider crops only when the user clicks.
+function showCropCheck(note) {
+  var res;
+  try { res = CROPCHECK.check(null); } catch (e) { note.textContent = "\u2717 " + e.message; return; }
+  var weak = res.joins.filter(function (j) { return j.current.weak; });
+  note.innerHTML = "";
+  if (!weak.length) { note.textContent = t("overlapOk"); return; }
+  weak.forEach(function (j) {
+    var line = document.createElement("div"), pair = (j.a + 1) + " \u2013 " + (j.b + 1);
+    var fixed = j.fallback && !j.fallback.weak;
+    line.textContent = (fixed ? t("overlapWeak") : j.manual ? t("overlapManual") : t("overlapNone")).replace("{pair}", pair);
+    note.appendChild(line);
+  });
+  if (res.suggestion) {
+    var btn = document.createElement("button");
+    btn.className = "btn btn-outline";
+    btn.style.marginTop = "8px";
+    btn.textContent = t("applyWiderCrop");
+    btn.onclick = function () {
+      res.suggestion.forEach(function (c) {
+        if (c.cropL != null) imgs[c.i].cropL = c.cropL;
+        if (c.cropR != null) imgs[c.i].cropR = c.cropR;
+      });
+      renderAdjust();
+      var n = document.getElementById("cropNote"); if (n) n.textContent = t("widerCropApplied");
+    };
+    note.appendChild(btn);
+  }
 }

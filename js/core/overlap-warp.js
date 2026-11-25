@@ -16,7 +16,8 @@ var OVERLAPWARP = (function () {
   var W = 650, H = 540, MARGIN_X = 95, MARGIN_TOP = 32, MARGIN_BOT = 28, CAP = 0.03 * H;
   var REG = [5, 10, 14, 17];
 
-  function gray(cv, w, h) { // luminance, resized, with a mask of non-background pixels
+  function gray(cv, w, h, marginX) { // luminance, resized, with a mask of non-background pixels
+    // marginX: limb margin to ignore, in model pixels (default MARGIN_X; the crop check uses less)
     var c = document.createElement("canvas"); c.width = w; c.height = h;
     var x = c.getContext("2d"); x.drawImage(cv, 0, 0, w, h);
     var d = x.getImageData(0, 0, w, h).data, g = new Float32Array(w * h), m = new Uint8Array(w * h);
@@ -26,7 +27,7 @@ var OVERLAPWARP = (function () {
     }
     // High-pass (subtract a box blur) so lighting gradients between photos don't drive the NCC, and
     // ignore the stretched limbs at either side of each strip (as the prototype's keypoint mask).
-    var r = Math.max(2, Math.round(w / 60)), hp = new Float32Array(w * h), mx = Math.round(w * MARGIN_X / W);
+    var r = Math.max(2, Math.round(w / 60)), hp = new Float32Array(w * h), mx = Math.round(w * (marginX == null ? MARGIN_X : marginX) / W);
     var row = new Float32Array(w * h);
     for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
       var s = 0, n = 0; for (var k = -r; k <= r; k++) { var xx = x + k; if (xx >= 0 && xx < w) { s += g[y * w + xx]; n++; } }
@@ -80,13 +81,13 @@ var OVERLAPWARP = (function () {
   }
 
   // Patch matches in the overlap at full model resolution. Returns arrays of [xa, ya, xb, yb].
-  function patchMatches(A, B, shift) {
-    var R = 7, STEP = 18, SY = Math.ceil(CAP) + 4, SX = 2, out = [];
+  function patchMatches(A, B, shift, marginX) {
+    var R = 7, STEP = 18, SY = Math.ceil(CAP) + 4, SX = 2, out = [], MX = marginX == null ? MARGIN_X : marginX;
     var dx0 = Math.round(shift.dx), dy0 = Math.round(shift.dy);
-    var XSTEP = W - 2 * MARGIN_X - Math.abs(dx0) < 150 ? 9 : STEP; // denser columns in a narrow overlap
+    var XSTEP = W - 2 * MX - Math.abs(dx0) < 150 ? 9 : STEP; // denser columns in a narrow overlap
     for (var ya = MARGIN_TOP + R + 2; ya < H - MARGIN_BOT - R - 2; ya += STEP) {
-      for (var xa = MARGIN_X + R; xa < W - MARGIN_X - R; xa += XSTEP) {
-        var xb0 = xa - dx0; if (xb0 < MARGIN_X + R || xb0 >= W - MARGIN_X - R) continue;
+      for (var xa = MX + R; xa < W - MX - R; xa += XSTEP) {
+        var xb0 = xa - dx0; if (xb0 < MX + R || xb0 >= W - MX - R) continue;
         // texture check on A's patch
         var s = 0, ss = 0, k = 0, ok = true;
         for (var y = ya - R; y <= ya + R && ok; y++) for (var x = xa - R; x <= xa + R; x++) {
@@ -231,5 +232,5 @@ var OVERLAPWARP = (function () {
   }
 
   return { estimate: estimate, apply: apply, params: { W: W, H: H },
-    _internal: { gray: gray, coarseShift: coarseShift, patchMatches: patchMatches } }; // for tests
+    _internal: { gray: gray, coarseShift: coarseShift, patchMatches: patchMatches } }; // also used by CROPCHECK
 })();

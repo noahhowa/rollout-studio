@@ -1,7 +1,7 @@
 // Fit the Adjust overlap warp in the real app on a test set. Usage (from repo root):
 //   node museum-rollout-reconstruction/adjust-warp-app/fit-in-app.cjs lacma-168596 [OUT_DIR]
 // OUT_DIR gets the Stitch-ready strips. NOWARP=1: warp off. COEF=file.json: apply given coefficients.
-// FILES=01.jpg,03.jpg: choose photos.
+// FILES=01.jpg,03.jpg: choose photos. CROPS='[{},{},{"cropL":0.08}]': per-photo crop overrides.
 // usage: node run.cjs SET [OUTDIR]  — fits the overlap warp in the real app and optionally writes strips
 const http = require("http"), fs = require("fs"), path = require("path");
 const { chromium } = require("playwright");
@@ -17,6 +17,7 @@ const ROOT = require("path").resolve(__dirname, "../.."), set = process.argv[2],
   await p.goto(`http://localhost:${srv.address().port}/`);
   const files = process.env.FILES ? process.env.FILES.split(",") : fs.readdirSync(`${ROOT}/test-sets/${set}/photos`).filter((f) => /\.jpg$/.test(f)).sort();
   if (process.env.COEF) await p.evaluate((c) => { const est = OVERLAPWARP.estimate; OVERLAPWARP.estimate = () => ({ coefficients: c, before: 0, after: 0 }); }, JSON.parse(fs.readFileSync(process.env.COEF)).coefficients);
+  if (process.env.CROPS) await p.evaluate((c) => { window.CROPS = c; }, JSON.parse(process.env.CROPS));
   if (process.env.NOWARP) await p.evaluate(() => { window.NOWARP = true; });
   const res = await p.evaluate(async ({ set, files, write }) => {
     imgs = [];
@@ -25,7 +26,7 @@ const ROOT = require("path").resolve(__dirname, "../.."), set = process.argv[2],
       const sc = Math.min(1, 1200 / im.width), cv = document.createElement("canvas");
       cv.width = Math.round(im.width * sc); cv.height = Math.round(im.height * sc);
       cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
-      imgs.push({ cv, b: RIM2.detect(cv), cropL: 0.14, cropR: 0.86 });
+      imgs.push({ cv, b: RIM2.detect(cv), cropL: 0.14, cropR: 0.86 }); if (window.CROPS) Object.assign(imgs[imgs.length - 1], window.CROPS[imgs.length - 1] || {});
     }
     feather = 12; rebuildStripCache(); overlapWarpOn = !window.NOWARP;
     const t0 = performance.now(); const strips = buildStrips(); const ms = performance.now() - t0;
