@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Met seam lighting and base cleanup</title>
+<style>
+:root{color-scheme:light dark}body{max-width:1300px;margin:24px auto;padding:0 16px;font:16px/1.5 system-ui}
+img{display:block;width:100%;height:auto}figure{margin:0 0 22px}figcaption{margin:5px 0}p{max-width:80ch}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:600px){.pair{grid-template-columns:1fr}}
+</style>
+<h1>Met seam lighting and base cleanup</h1>
+<p>The same strips, base-edge warp, and seam paths are used on both sides. The new pass blends low-frequency color and light over 64 pixels on each side of a cut. Fine paint keeps the original narrow crossfade.</p>
+<div class="pair">
+<figure><figcaption>Base-edge correction</figcaption><a href="met-light-0.png"><img src="met-light-0.png" alt="Met panorama with base-edge alignment and original lighting joins"></a></figure>
+<figure><figcaption>Lighting blend and bottom trim</figcaption><a href="met-light-trimmed.png"><img src="met-light-trimmed.png" alt="Met panorama with softened lighting joins and lower background rows removed"></a></figure>
+</div>
+<p><a href="met-light-64.png">Full-height version with lighting blend</a></p>
+<h2>Same-scale close-ups</h2>
+<figure><figcaption>Base and residual red-band discontinuity</figcaption><a href="met-base-closeup.jpg"><img src="met-base-closeup.jpg" alt="Before and after close-up around the red base band, showing the trimmed lower edge on the right"></a></figure>
+<figure><figcaption>Lighting around central joins</figcaption><a href="met-lighting-closeup.jpg"><img src="met-lighting-closeup.jpg" alt="Same-scale view of lighting around the center of the Met panorama before and after blending"></a></figure>
+<p>The lighting-only candidate reduced the local tone-jump proxy on seven of eight cuts. The median of the join-level 90th percentiles fell from 57.88 to 55.00 in image intensity units. The toughest cut rose slightly. A fitted per-strip exposure field gave 55.40 and was left out of the selected render.</p>
+<p>The optional 20-row trim was chosen by eye. It removes visible background slivers and crops a small amount of the lowest dark edge in some columns. The full-height version preserves those rows. Red-band color and silhouette differences remain.</p>
+<p><a href="met-light-0.json">Baseline diagnostics</a> · <a href="met-light-64.json">Lighting diagnostics</a> · <a href="met-light-field.png">Exposure-field trial</a></p>

@@ -7,3 +7,9 @@ From the Rollout Studio checkout with Playwright and Chromium, run `prepare-stri
 Run `run-hf.py WORK_DIR/baseline WORK_DIR/baseline.png` and then `run-hf.py WORK_DIR/adjusted WORK_DIR/adjusted.png` for fresh jobs. Use a new output filename for a new job. The service baseline for this report used the four public photos of LACMA 168693 in numerical order. Both arms used the same crop and runtime.
 
 For seam measurement, download the Space’s public `panorama_stitch_memsafe.py` as a local file and pass it to `measure-overlaps.py` as the first argument, followed by the full strips directory, working directory, coefficients JSON path, and output JSON path. The Space code seeds the source-to-panorama registration. The measurement then uses feature matches to each returned panorama.
+
+The research seam stitcher accepts `--nonlinear-vertical` to try a bounded per-strip
+quadratic after the scale fit. It keeps the scale-only output when the spatial
+holdout regresses. Use `--preview-rejected-warp` to render a rejected candidate
+for visual review. The optional JSON includes held-out scale, affine, and nonlinear
+residuals, the sources that had sufficient vertical support, and the gate decision.

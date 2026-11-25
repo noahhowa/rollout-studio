@@ -1,0 +1,15 @@
+{
+  "anchors": 2,
+  "status": "insufficient evidence",
+  "order": [
+    3,
+    2,
+    1,
+    0
+  ],
+  "baseSeams": [
+    712,
+    1226,
+    1875
+  ]
+}

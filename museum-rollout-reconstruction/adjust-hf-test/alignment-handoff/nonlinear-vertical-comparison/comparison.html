@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bounded vertical warp comparison</title>
+<style>
+:root{color-scheme:light dark}body{max-width:1200px;padding:0 20px;margin:28px auto;font:16px/1.5 system-ui,sans-serif}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}figure{margin:0}img{display:block;width:100%;height:auto}
+.table-wrap{overflow-x:auto}table{border-collapse:collapse;min-width:450px}th,td{padding:6px 12px;text-align:left;border-bottom:1px solid #8887}
+figcaption{margin-bottom:6px}h2{margin-top:34px}.closeup{max-width:650px}
+@media(max-width:600px){.pair{grid-template-columns:1fr}}
+</style>
+<h1>Bounded vertical warp</h1>
+<p>Both runs used the same adjusted source strips, horizontal placement, and color-only seam cost. The experiment fits a small quadratic correction after the existing vertical scale fit, bounded to 8 px per strip. Only strips with enough landmark coverage participate. Beyond the supported height range, the correction stays constant.</p>
+<h2>The Met 310364</h2>
+<div class="pair">
+<figure><figcaption>Current scale fit</figcaption><a href="met-310364-scale.png"><img src="met-310364-scale.png" alt="Met panorama reconstructed with the current scale fit"></a></figure>
+<figure><figcaption>Scale plus nonlinear warp</figcaption><a href="met-310364-warp.png"><img src="met-310364-warp.png" alt="Met panorama reconstructed with the bounded nonlinear vertical warp"></a></figure>
+</div>
+<h3>Rim and base close-ups</h3>
+<p>Scale fit on the left. Nonlinear warp on the right. The upper row shows the rim and the lower row shows the base. Each pair uses the same pixel scale.</p>
+<div class="pair">
+<figure><figcaption>Overlap near x = 695 px</figcaption><a href="met-310364-join-695.jpg"><img src="met-310364-join-695.jpg" alt="Met rim and base around x 695"></a></figure>
+<figure><figcaption>Overlap near x = 1209 px</figcaption><a href="met-310364-join-1209.jpg"><img src="met-310364-join-1209.jpg" alt="Met rim and base around x 1209"></a></figure>
+</div>
+<h2>LACMA 168596</h2>
+<div class="pair">
+<figure><figcaption>Current scale fit</figcaption><a href="lacma-168596-scale.png"><img src="lacma-168596-scale.png" alt="LACMA panorama reconstructed with the current scale fit"></a></figure>
+<figure><figcaption>Nonlinear candidate preview · guard rejected</figcaption><a href="lacma-168596-warp.png"><img src="lacma-168596-warp.png" alt="LACMA panorama with the rejected nonlinear candidate forced on for comparison"></a></figure>
+</div>
+<h3>Rim and base close-ups</h3>
+<div class="pair">
+<figure><figcaption>Overlap near x = 776 px</figcaption><a href="lacma-168596-join-776.jpg"><img src="lacma-168596-join-776.jpg" alt="LACMA rim and base around x 776, current scale on left and experimental warp on right"></a></figure>
+<figure><figcaption>Overlap near x = 1303 px</figcaption><a href="lacma-168596-join-1303.jpg"><img src="lacma-168596-join-1303.jpg" alt="LACMA rim and base around x 1303, current scale on left and experimental warp on right"></a></figure>
+</div>
+<h2>Independent approach · base-edge profiles</h2>
+<p>This approach matches signed gradients near the base and adjusts only the lower part of the strip. Its own held-out base anchors improved from 8.00 to 3.56 px on the Met (60 anchors, 18 pairs). These are different landmarks from the quadratic fit's holdout. LACMA yielded two reliable anchors and retained the scale fit.</p>
+<p><a href="../pr22-base-edge-comparison/met-base.png">Full Met base-edge output</a> · <a href="../pr22-base-edge-comparison/met-base-detail.jpg">Base-edge close-up at the red band</a> · <a href="../pr22-base-edge-comparison/lacma-base.png">Full LACMA fallback</a> · <a href="../pr22-base-edge-comparison/met-base.json">Base-edge metrics</a></p>
+<h3>Met base · all three versions at native scale</h3>
+<p>Each crop uses the same horizontal window and is aligned to the bottom of its canvas.</p>
+<figure><figcaption>Near x = 695 px</figcaption><a href="met-three-way-695.jpg"><img src="met-three-way-695.jpg" alt="Met base near x 695, current scale fit, nonlinear warp, and base-edge correction"></a></figure>
+<figure><figcaption>Near x = 1209 px</figcaption><a href="met-three-way-1209.jpg"><img src="met-three-way-1209.jpg" alt="Met base near x 1209, current scale fit, nonlinear warp, and base-edge correction"></a></figure>
+<figure><figcaption>Near x = 1515 px</figcaption><a href="met-three-way-1515.jpg"><img src="met-three-way-1515.jpg" alt="Met base near x 1515, current scale fit, nonlinear warp, and base-edge correction"></a></figure>
+<h2>Held-out vertical mismatch · landmark-driven warp</h2>
+<p>Absolute vertical distance between matched painted landmarks in pixels. Five spatial groups were held out in turn. Rim and base are the first and last quarters of the strip. These residuals measure overlap alignment; the close-ups show what happened at the blended cut.</p>
+<div class="table-wrap"><table><thead><tr><th>Case</th><th>Region</th><th>Points</th><th>Median px</th><th>90th percentile px</th></tr></thead><tbody>
+<tr><td>Met</td><td>Rim</td><td>2,005</td><td>1.39 → 1.25</td><td>5.30 → 3.85</td></tr>
+<tr><td>Met</td><td>Base</td><td>342</td><td>4.36 → 4.19</td><td>9.53 → 9.03</td></tr>
+<tr><td>LACMA</td><td>Rim</td><td>430</td><td>1.18 → 1.22</td><td>3.40 → 2.93</td></tr>
+<tr><td>LACMA</td><td>Base</td><td>0</td><td>—</td><td>—</td></tr>
+</tbody></table></div>
+<p><a href="met-310364-warp.json">Met metrics</a> · <a href="lacma-168596-warp.json">LACMA metrics</a></p>
+</html>

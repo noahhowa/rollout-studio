@@ -1,0 +1,112 @@
+{
+  "period": 1028,
+  "repeatCorrelation": 0.2599811255931854,
+  "tiles": [
+    "05-auto:-1028",
+    "01-auto:+0",
+    "04-auto:+0",
+    "03-auto:+0",
+    "05-auto:+0",
+    "01-auto:+1028"
+  ],
+  "color": {
+    "coverage": 0.9996885652308646,
+    "joins": [
+      {
+        "sources": [
+          "05-auto:-1028",
+          "01-auto:+0"
+        ],
+        "center": 250,
+        "strokeMismatchP90": 820.8673095703125,
+        "strongInkRows": 323
+      },
+      {
+        "sources": [
+          "01-auto:+0",
+          "04-auto:+0"
+        ],
+        "center": 489,
+        "strokeMismatchP90": 735.8713989257812,
+        "strongInkRows": 309
+      },
+      {
+        "sources": [
+          "04-auto:+0",
+          "03-auto:+0"
+        ],
+        "center": 747,
+        "strokeMismatchP90": 624.5121459960938,
+        "strongInkRows": 288
+      },
+      {
+        "sources": [
+          "03-auto:+0",
+          "05-auto:+0"
+        ],
+        "center": 1020,
+        "strokeMismatchP90": 1311.0611572265625,
+        "strongInkRows": 259
+      },
+      {
+        "sources": [
+          "05-auto:+0",
+          "01-auto:+1028"
+        ],
+        "center": 1283,
+        "strokeMismatchP90": 1166.8662109375,
+        "strongInkRows": 332
+      }
+    ]
+  },
+  "stroke": {
+    "coverage": 0.9996885652308646,
+    "joins": [
+      {
+        "sources": [
+          "05-auto:-1028",
+          "01-auto:+0"
+        ],
+        "center": 246,
+        "strokeMismatchP90": 707.907958984375,
+        "strongInkRows": 239
+      },
+      {
+        "sources": [
+          "01-auto:+0",
+          "04-auto:+0"
+        ],
+        "center": 491,
+        "strokeMismatchP90": 498.3183898925781,
+        "strongInkRows": 231
+      },
+      {
+        "sources": [
+          "04-auto:+0",
+          "03-auto:+0"
+        ],
+        "center": 746,
+        "strokeMismatchP90": 425.3051452636719,
+        "strongInkRows": 163
+      },
+      {
+        "sources": [
+          "03-auto:+0",
+          "05-auto:+0"
+        ],
+        "center": 1016,
+        "strokeMismatchP90": 904.4008178710938,
+        "strongInkRows": 196
+      },
+      {
+        "sources": [
+          "05-auto:+0",
+          "01-auto:+1028"
+        ],
+        "center": 1277,
+        "strokeMismatchP90": 791.1187744140625,
+        "strongInkRows": 198
+      }
+    ]
+  }
+}
