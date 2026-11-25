@@ -30,9 +30,8 @@ function med(a) {
   });
   return s[s.length >> 1];
 }
-// Auto-order photos before stitching (Adjust step checkbox). Off by default: the upload order is
-// trusted unless the user asks for reordering.
-var autoOrderOn = false;
+// Adjust auto-sort by overlap: done once per set of photos (key = sorted upload seqs).
+var autoSort = { key: null, order: null, prev: null, checking: false };
 // Bounded vertical overlap correction before stitching (Adjust step checkbox, experimental).
 // Off by default; declined fits fall back to the original strips. Last result in overlapWarpReport.
 var overlapWarpOn = false,
