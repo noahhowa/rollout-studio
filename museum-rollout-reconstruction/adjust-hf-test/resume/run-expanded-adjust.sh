@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -eu
 testroot=$(cd "$(dirname "$0")/.." && pwd)
-raw="$testroot/resume/adjust-expanded"
-for id in lacma-168596 met-310364; do
+raw="${RUN_ROOT:-$testroot/resume/adjust-expanded}"
+for id in ${VESSELS:-lacma-168596 met-310364}; do
   for arm in ${ARMS:-baseline adjusted lower-feather}; do
     folder="$raw/$id"
     [ ! -s "$folder/$arm.png" ] || continue
     inputs="$folder/$arm"
     [ "$arm" != lower-feather ] || inputs="$folder/lower-feather/adjusted"
-    if [ "$id" = lacma-168596 ]; then
+    if [ "$id" != met-310364 ]; then
       python3 "$testroot/run-hf.py" "$inputs" "$folder/$arm.png"
       continue
     fi
