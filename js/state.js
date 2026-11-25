@@ -37,3 +37,6 @@ var autoOrderOn = false;
 // Off by default; declined fits fall back to the original strips. Last result in overlapWarpReport.
 var overlapWarpOn = false,
   overlapWarpReport = null;
+// Merge strips in the browser with seams instead of the Hugging Face stitcher (Adjust checkbox,
+// beta). Off by default; if the merge can't place every photo, Stitch falls back to the server.
+var seamMergeOn = false;

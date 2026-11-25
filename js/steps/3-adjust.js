@@ -30,6 +30,12 @@ function renderAdjust() {
     '<input type="checkbox" id="overlapWarpToggle"' + (overlapWarpOn ? " checked" : "") + '><label for="overlapWarpToggle">' + t("overlapWarp") + "</label>";
   wchk.querySelector("input").onchange = function () { overlapWarpOn = this.checked; };
   card.appendChild(wchk);
+  var schk = document.createElement("div");
+  schk.className = "chk-row";
+  schk.innerHTML =
+    '<input type="checkbox" id="seamMergeToggle"' + (seamMergeOn ? " checked" : "") + '><label for="seamMergeToggle">' + t("seamMerge") + "</label>";
+  schk.querySelector("input").onchange = function () { seamMergeOn = this.checked; };
+  card.appendChild(schk);
   var sep = document.createElement("div");
   sep.style.cssText = "height:1px;background:var(--border-lt);margin:14px 0";
   card.appendChild(sep);

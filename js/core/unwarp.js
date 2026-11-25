@@ -219,3 +219,9 @@ function buildStrips() {
     return featherEdges(cropStrip(src[i], im.cropL, im.cropR), ff);
   });
 }
+// Cropped strips without feathering, for the browser seam merge (its seams need hard source pixels).
+function buildRawStrips() {
+  if (stripCache.length !== imgs.length) rebuildStripCache();
+  var src = warpedStrips();
+  return imgs.map(function (im, i) { return cropStrip(src[i], im.cropL, im.cropR); });
+}
