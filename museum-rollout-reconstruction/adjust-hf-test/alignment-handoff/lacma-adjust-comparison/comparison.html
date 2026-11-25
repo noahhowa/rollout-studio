@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bounded Adjust warp on two LACMA vessels</title>
+<style>
+:root { color-scheme: dark; }
+body { max-width: 1322px; margin: 28px auto; padding: 0 18px; background: #111; color: #eee; font: 16px/1.5 system-ui, sans-serif; }
+p { max-width: 88ch; }
+a { color: #b8cdff; }
+img { display: block; max-width: 100%; height: auto; }
+figure { margin: 16px 0; }
+figcaption { margin: 4px 0; color: #ccc; }
+section + section { border-top: 1px solid #444; margin-top: 32px; }
+</style>
+<h1>Bounded Adjust warp on two LACMA vessels</h1>
+<p>Both arms use the same four source photos per vessel, detected rims, Map unwarp, 8–92% crop, and 12% feathering. The second arm adds the experimental overlap-fitted vertical warp, capped at 3% of strip height. Hugging Face stitched both arms. The images show the outputs before Refine.</p>
+<p>Map flattened the source views in both arms. The comparison isolates the effect of the additional Adjust warp on the delivered stitch. Overlap disagreement measures matched landmarks, while the crops show the actual paint and exposure transitions.</p>
+
+<section><h2>LACMA 168596</h2><p>The right third sits more level in the adjusted stitch, with a clearer change at the rim and base. Total overlap disagreement falls at all three joins. Vertical disagreement improves at one join and increases at two. The first two overlap crops show less doubled paint.</p>
+<img src="168596-full.jpg" alt="Full Hugging Face panoramas for LACMA 168596, before and after the bounded Adjust warp">
+<p><a href="../../resume/adjust-expanded/lacma-168596/baseline.png">Full before PNG</a> · <a href="../../resume/adjust-expanded/lacma-168596/adjusted.png">Full after PNG</a></p>
+<h3>Overlap close-ups</h3><p>Crops are centered on the corresponding overlap in each run and use the same pixel scale.</p>
+<figure><a href="168596-join-1.jpg"><img src="168596-join-1.jpg" alt="Views 1 and 2 | total 14.46 to 4.22 px | vertical 1.90 to 0.59 px"></a><figcaption>Views 1 and 2 | total 14.46 to 4.22 px | vertical 1.90 to 0.59 px</figcaption></figure>
+<figure><a href="168596-join-2.jpg"><img src="168596-join-2.jpg" alt="Views 2 and 3 | total 8.97 to 5.18 px | vertical 1.34 to 1.90 px"></a><figcaption>Views 2 and 3 | total 8.97 to 5.18 px | vertical 1.34 to 1.90 px</figcaption></figure>
+<figure><a href="168596-join-3.jpg"><img src="168596-join-3.jpg" alt="Views 3 and 4 | total 6.46 to 5.25 px | vertical 0.80 to 1.19 px"></a><figcaption>Views 3 and 4 | total 6.46 to 5.25 px | vertical 0.80 to 1.19 px</figcaption></figure>
+</section>
+<section><h2>LACMA 168693</h2><p>Vertical overlap disagreement falls at all three joins. The full rollouts look similar and there are still lower-border steps and exposure changes.</p>
+<img src="168693-full.jpg" alt="Full Hugging Face panoramas for LACMA 168693, before and after the bounded Adjust warp">
+<p><a href="../../images/baseline.png">Full before PNG</a> · <a href="../../images/adjusted.png">Full after PNG</a></p>
+<h3>Overlap close-ups</h3><p>Crops are centered on the corresponding overlap in each run and use the same pixel scale.</p>
+<figure><a href="168693-join-1.jpg"><img src="168693-join-1.jpg" alt="Views 1 and 2 | vertical 3.18 to 1.83 px"></a><figcaption>Views 1 and 2 | vertical 3.18 to 1.83 px</figcaption></figure>
+<figure><a href="168693-join-2.jpg"><img src="168693-join-2.jpg" alt="Views 2 and 3 | vertical 3.65 to 2.28 px"></a><figcaption>Views 2 and 3 | vertical 3.65 to 2.28 px</figcaption></figure>
+<figure><a href="168693-join-3.jpg"><img src="168693-join-3.jpg" alt="Views 3 and 4 | vertical 2.47 to 2.07 px"></a><figcaption>Views 3 and 4 | vertical 2.47 to 2.07 px</figcaption></figure>
+</section>
+</html>

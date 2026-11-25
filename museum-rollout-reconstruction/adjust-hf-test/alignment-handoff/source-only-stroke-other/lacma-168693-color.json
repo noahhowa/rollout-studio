@@ -1,0 +1,37 @@
+{
+  "anchors": 4,
+  "status": "insufficient evidence",
+  "order": [
+    2,
+    1,
+    0,
+    3
+  ],
+  "baseSeams": [
+    609,
+    1063,
+    1501
+  ],
+  "seamToneJumpP90": [
+    28.161,
+    24.626,
+    26.152
+  ],
+  "lightBlendRadius": 64,
+  "bottomRowsTrimmed": 0,
+  "strokeAware": false,
+  "strokeCuts": [
+    {
+      "strongInkRows": 695,
+      "interiorRows": 1315
+    },
+    {
+      "strongInkRows": 438,
+      "interiorRows": 1315
+    },
+    {
+      "strongInkRows": 385,
+      "interiorRows": 1311
+    }
+  ]
+}

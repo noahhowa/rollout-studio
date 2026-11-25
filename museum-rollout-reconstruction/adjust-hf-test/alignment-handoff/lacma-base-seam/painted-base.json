@@ -1,0 +1,60 @@
+{
+  "anchors": 4,
+  "status": "insufficient evidence",
+  "order": [
+    2,
+    1,
+    0,
+    3
+  ],
+  "baseSeams": [
+    602,
+    1046,
+    1511
+  ],
+  "seamToneJumpP90": [
+    22.362,
+    18.389,
+    23.191
+  ],
+  "lightBlendRadius": 64,
+  "bottomRowsTrimmed": 0,
+  "strokeAware": true,
+  "strokeCuts": [
+    {
+      "strongInkRows": 360,
+      "interiorRows": 1315
+    },
+    {
+      "strongInkRows": 214,
+      "interiorRows": 1315
+    },
+    {
+      "strongInkRows": 212,
+      "interiorRows": 1311
+    }
+  ],
+  "localAlignment": [
+    {
+      "before": 19.350811004638672,
+      "after": 17.34870147705078,
+      "pixels": 295216,
+      "peakPx": 5.634922981262207,
+      "minimumJacobian": 0.7310913801193237
+    },
+    {
+      "before": 15.294251441955566,
+      "after": 12.683621406555176,
+      "pixels": 317959,
+      "peakPx": 6.189173698425293,
+      "minimumJacobian": 0.5458433628082275
+    },
+    {
+      "before": 16.610748291015625,
+      "after": 14.860291481018066,
+      "pixels": 84033,
+      "peakPx": 5.641804218292236,
+      "minimumJacobian": 0.6172465682029724
+    }
+  ]
+}

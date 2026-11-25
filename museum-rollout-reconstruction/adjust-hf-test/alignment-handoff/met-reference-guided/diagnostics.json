@@ -1,0 +1,57 @@
+{
+  "region": [
+    1060,
+    277,
+    1245,
+    402
+  ],
+  "owner": "05-auto.png",
+  "eligible": [
+    [
+      "05-auto.png",
+      4.745253562927246
+    ],
+    [
+      "09-auto.png",
+      5.921327590942383
+    ]
+  ],
+  "layers": {
+    "01-auto.png": {
+      "supportedPixels": 143229,
+      "peakMotionPx": 5.948284149169922
+    },
+    "03-auto.png": {
+      "supportedPixels": 145886,
+      "peakMotionPx": 5.86739444732666
+    },
+    "04-auto.png": {
+      "supportedPixels": 145955,
+      "peakMotionPx": 5.8957695960998535
+    },
+    "05-auto.png": {
+      "supportedPixels": 143138,
+      "peakMotionPx": 5.870125770568848
+    },
+    "06-auto.png": {
+      "supportedPixels": 139094,
+      "peakMotionPx": 5.956371307373047
+    },
+    "07-auto.png": {
+      "supportedPixels": 144893,
+      "peakMotionPx": 5.97796630859375
+    },
+    "08-auto.png": {
+      "supportedPixels": 138930,
+      "peakMotionPx": 5.838386058807373
+    },
+    "09-auto.png": {
+      "supportedPixels": 125669,
+      "peakMotionPx": 5.864964962005615
+    },
+    "10-auto.png": {
+      "supportedPixels": 139786,
+      "peakMotionPx": 5.9563679695129395
+    }
+  }
+}

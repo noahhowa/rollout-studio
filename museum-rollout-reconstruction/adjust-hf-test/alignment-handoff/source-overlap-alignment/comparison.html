@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Source-only overlap alignment before seam cuts</title>
+<style>
+:root{color-scheme:light dark}body{max-width:1160px;margin:24px auto;padding:0 16px;font:16px/1.5 system-ui}
+img{display:block;width:100%;height:auto}figure{margin:0 0 22px}figcaption{margin:5px 0}p{max-width:84ch}
+</style>
+<h1>Source-only overlap alignment</h1>
+<p>Both arms use the same source strips, global placement, and stroke-aware seam cost. The trial estimates dense motion directly between overlaps before selecting the cuts. It checks flow consistency, tapers at overlap edges, and limits the spatial derivatives of the warp to guard against folding. The displacement ceiling was 18 px. The largest actual displacement was 6.23 px.</p>
+<p>Neither arm loads the museum rollout. The before-and-after crops use identical native image coordinates.</p>
+<h2>The Met 310364</h2>
+<figure><a href="met-310364-closeup.jpg"><img src="met-310364-closeup.jpg" alt="The Met 310364 seam close-up before and after bounded local motion"></a>
+<figcaption>The short inner stroke becomes single. A small break reappears in the outer contour above it. Strong-paint rows crossed by the seams: 1,960 → 1,736.</figcaption></figure>
+<p><a href="../met-source-only-stroke/stroke.png">Full before</a> · <a href="met-310364-after.png">Full after</a> · <a href="met-310364-after-seams.png">After with seam overlay</a> · <a href="met-310364-after.json">Diagnostics</a></p>
+<h2>LACMA 168596</h2>
+<figure><a href="lacma-168596-closeup.jpg"><img src="lacma-168596-closeup.jpg" alt="LACMA 168596 seam close-up before and after bounded local motion"></a>
+<figcaption>The selected glyph-band join looks broadly similar; exposure variation remains. Strong-paint rows crossed by the seams: 631 → 525.</figcaption></figure>
+<p><a href="../source-only-stroke-other/lacma-168596-stroke.png">Full before</a> · <a href="lacma-168596-after.png">Full after</a> · <a href="lacma-168596-after-seams.png">After with seam overlay</a> · <a href="lacma-168596-after.json">Diagnostics</a></p>
+<h2>LACMA 168693</h2>
+<figure><a href="lacma-168693-closeup.jpg"><img src="lacma-168693-closeup.jpg" alt="LACMA 168693 seam close-up before and after bounded local motion"></a>
+<figcaption>The selected figure join stays similar; the base still bows. Strong-paint rows crossed by the seams: 863 → 796.</figcaption></figure>
+<p><a href="../source-only-stroke-other/lacma-168693-stroke.png">Full before</a> · <a href="lacma-168693-after.png">Full after</a> · <a href="lacma-168693-after-seams.png">After with seam overlay</a> · <a href="lacma-168693-after.json">Diagnostics</a></p>
+<p>Crossed rows are a routing measure. Inspect the close-ups for changes in actual strokes. This is an opt-in research experiment.</p>

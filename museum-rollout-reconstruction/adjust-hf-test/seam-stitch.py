@@ -9,11 +9,13 @@ per-strip gain matching. Paint is never averaged from two misaligned photos, so 
 
 Usage: seam-stitch.py STRIP_DIR "0,1,2,3" OUT.png [REPORT.json]
 """
+import argparse
 import json
-import sys
 
 import cv2
 import numpy as np
+
+import vertical_warp
 
 
 def shift_between(a, b):
@@ -60,7 +62,7 @@ def shift_between(a, b):
         bs, inl = 1.0, np.abs(ya - yb - np.median(ya - yb)) < 3
         bt = float(np.median((ya - yb)[inl]))
     tx = float(np.median((pr[:, 0] - pr[:, 2])[inl]))
-    return (tx, float(bs), float(bt)), int(inl.sum()), len(pr)
+    return (tx, float(bs), float(bt)), int(inl.sum()), len(pr), pr
 
 
 def seam_path(cost, lo, hi):
@@ -93,15 +95,15 @@ def place(strips):
     for i in range(n):
         for j in range(i + 1, n):
             try:
-                s, ninl, nm = shift_between(strips[i], strips[j])
+                s, ninl, nm, matches = shift_between(strips[i], strips[j])
             except RuntimeError:
                 continue
             if ninl >= 25:
-                edges.append((ninl, i, j, s))
+                edges.append((ninl, i, j, s, matches))
     # pose k: x_0 = x_k + X, y_0 = S * y_k + T (strip 0's frame)
     pos = {0: (0.0, 1.0, 0.0)}
     while len(pos) < n:
-        cand = [(w, i, j, s) for w, i, j, s in edges if (i in pos) != (j in pos)]
+        cand = [(w, i, j, s) for w, i, j, s, _ in edges if (i in pos) != (j in pos)]
         if not cand:
             raise RuntimeError(f"strips {sorted(set(range(n)) - set(pos))} could not be placed")
         w, i, j, (tx, sy, ty) = max(cand, key=lambda e: e[0])
@@ -112,11 +114,27 @@ def place(strips):
             X, S, T = pos[j]
             pos[i] = (X - tx, S / sy, T - S * ty / sy)
     order = sorted(range(n), key=lambda k: pos[k][0])
-    return order, [pos[k] for k in order]
+    return order, [pos[k] for k in order], edges
 
 
-def stitch(strips, feather=4):
-    order, P = place(strips)
+def seam_cost(left, right, both, structure_weight):
+    color = cv2.GaussianBlur(np.abs(left - right).sum(axis=2), (5, 5), 0)
+    # A painted horizontal line has a vertical gradient. Matching signed gradients
+    # lets the seam cross a continuous line while penalizing shifted or doubled edges.
+    grayscale = [cv2.cvtColor(layer.astype(np.float32), cv2.COLOR_BGR2GRAY) for layer in (left, right)]
+    gradients = [cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3, scale=0.25) for gray in grayscale]
+    mismatch = cv2.GaussianBlur(np.abs(gradients[0] - gradients[1]), (5, 5), 0)
+    # A mask boundary is not a painted edge. Ignore gradients touching padding.
+    interior = cv2.erode(both.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
+    mismatch[~interior] = 0
+    cost = color + structure_weight * mismatch
+    cost[~both] = 1e4
+    return cost, color, mismatch, interior
+
+
+def stitch(strips, feather=4, structure_weight=0.0, nonlinear=False, preview_rejected=False):
+    order, P, edges = place(strips)
+    sizes = [s.shape[0] for s in strips]
     n = len(order)
     S = np.array([p[1] for p in P])
     S = S / np.exp(np.mean(np.log(S)))  # keep the average strip height unchanged
@@ -130,6 +148,17 @@ def stitch(strips, feather=4):
             for i in range(n - 1)]
     pos[:, 1] -= pos[:, 1].min()
     off = np.round(pos).astype(int)
+    warp_report = None
+    if nonlinear or preview_rejected:
+        heights = [s.shape[0] for s in strips]
+        coefficients, supports, warp_report = vertical_warp.fit_warp(
+            edges, order, sizes, heights, off, preview_rejected=preview_rejected)
+        if warp_report.get('rendered'):
+            for i, coeff in enumerate(coefficients):
+                if coeff.any():
+                    strips[i], dy = vertical_warp.resample(strips[i], coeff, supports[i])
+                    off[i, 1] += dy
+            off[:, 1] -= off[:, 1].min()
     Wc = int(max(off[i, 0] + strips[i].shape[1] for i in range(n)))
     Hc = int(max(off[i, 1] + strips[i].shape[0] for i in range(n)))
     layers, valid = [], []
@@ -160,10 +189,8 @@ def stitch(strips, feather=4):
             raise RuntimeError(f"join {i - 1}-{i}: no overlap")
         a, b = cols[0], cols[-1]
         lo, hi = int(a + 0.2 * (b - a)), int(a + 0.8 * (b - a))
-        diff = np.abs(out - layers[i]).sum(axis=2)
-        diff = cv2.GaussianBlur(diff, (5, 5), 0)
-        diff[~both] = 1e4  # never cut through a region one strip doesn't cover
-        path = seam_path(diff, lo, hi)
+        cost, color, gradient, interior = seam_cost(out, layers[i], both, structure_weight)
+        path = seam_path(cost, lo, hi)
         xs = np.arange(Wc)[None, :]
         dist = xs - path[:, None]  # >0: right of seam
         w = np.clip((dist + feather) / (2 * feather), 0, 1)  # 0 left .. 1 right, narrow ramp
@@ -173,19 +200,37 @@ def stitch(strips, feather=4):
         have |= valid[i]
         rows = np.arange(Hc)
         ok = both[rows, path]
+        interior_rows = interior[rows, path]
         info[i - 1].update({"seamX": [int(path.min()), int(path.max())], "overlapCols": [int(a), int(b)],
-                            "seamMeanDiff": round(float(np.median(diff[rows[ok], path[ok]])), 2) if ok.any() else None,
+                            "seamMeanDiff": round(float(np.median(color[rows[ok], path[ok]])), 2) if ok.any() else None,
+                            "seamGradientP90": round(float(np.percentile(gradient[rows[interior_rows], path[interior_rows]], 90)), 2) if interior_rows.any() else None,
+                            "overlapRows": int(ok.sum()),
                             "center": [int(np.median(path[ok])) if ok.any() else int((a + b) / 2), int(Hc / 2)]})
     out[~have] = 0
-    return np.clip(out, 0, 255).astype(np.uint8), info, gain.tolist()
+    return np.clip(out, 0, 255).astype(np.uint8), info, gain.tolist(), warp_report
 
 
 if __name__ == "__main__":
-    folder, order, outp = sys.argv[1], [int(v) for v in sys.argv[2].split(",")], sys.argv[3]
-    strips = [cv2.imread(f"{folder}/strip_{i}.jpg") for i in order]
-    pano, info, gain = stitch(strips)  # placement order is found from the images
-    cv2.imwrite(outp, pano)
-    rep = {"order": order, "size": [pano.shape[1], pano.shape[0]], "joins": info, "gains": gain}
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("folder")
+    parser.add_argument("order", type=lambda value: [int(v) for v in value.split(",")])
+    parser.add_argument("output")
+    parser.add_argument("report", nargs="?")
+    parser.add_argument("--structure-weight", type=float, default=0.0,
+                        help="Use 0 to reproduce the color-only seam")
+    parser.add_argument("--nonlinear-vertical", action="store_true")
+    parser.add_argument("--preview-rejected-warp", action="store_true",
+                        help="Render the experimental candidate even if its holdout check rejects it")
+    args = parser.parse_args()
+    strips = [cv2.imread(f"{args.folder}/strip_{i}.jpg") for i in args.order]
+    pano, info, gain, warp_report = stitch(strips, structure_weight=args.structure_weight,
+                                           nonlinear=args.nonlinear_vertical,
+                                           preview_rejected=args.preview_rejected_warp)
+    cv2.imwrite(args.output, pano)
+    rep = {"order": args.order, "size": [pano.shape[1], pano.shape[0]], "joins": info, "gains": gain}
+    if warp_report is not None:
+        rep["verticalWarp"] = warp_report
     print(json.dumps(rep, indent=1))
-    if len(sys.argv) > 4:
-        json.dump(rep, open(sys.argv[4], "w"), indent=1)
+    if args.report:
+        with open(args.report, "w") as report:
+            json.dump(rep, report, indent=1)
