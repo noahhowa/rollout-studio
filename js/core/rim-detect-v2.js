@@ -403,6 +403,59 @@ var RIM2 = (function () {
     e.b = (e.b + fit.b) / 2;
   }
 
+  // An open mouth whose interior and lip match the backdrop colour (grey inside, grey backdrop)
+  // drops out of the colour mask, leaving a flat top just below the lip. When the fit is flat, look
+  // just above it for an ellipse of the same width whose whole outline (back edge against the
+  // backdrop, front lip) follows strong image edges, and keep it only if it clearly beats the flat line.
+  function recoverOpenMouth(cv, e, height) {
+    if (e.b > 0.03 * e.a || e.a < 20) return;
+    var x0 = Math.max(0, Math.floor(e.xc - e.a - 4)), x1 = Math.min(cv.width, Math.ceil(e.xc + e.a + 4));
+    var y0 = Math.max(0, Math.floor(e.yc - 0.12 * height - 0.5 * e.a)), y1 = Math.min(cv.height, Math.ceil(e.yc + 0.03 * height));
+    var w = x1 - x0, h = y1 - y0;
+    if (w < 20 || h < 20) return;
+    var d = cv.getContext("2d").getImageData(x0, y0, w, h).data, g = new Float32Array(w * h), gb = new Float32Array(w * h);
+    for (var i = 0; i < w * h; i++) g[i] = 0.299 * d[4 * i] + 0.587 * d[4 * i + 1] + 0.114 * d[4 * i + 2];
+    var r = Math.max(1, Math.round(cv.width / WORK)); // box blur ~ the detector's working scale
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var sum = 0, n = 0;
+      for (var dy = -r; dy <= r; dy++) for (var dx = -r; dx <= r; dx++) {
+        var yy = y + dy, xx = x + dx; if (yy >= 0 && yy < h && xx >= 0 && xx < w) { sum += g[yy * w + xx]; n++; }
+      }
+      gb[y * w + x] = sum / n;
+    }
+    function edge(px, py, nx, ny) { // strongest directional derivative within +-r of (px, py) along the normal
+      var best = 0;
+      for (var t = -r; t <= r; t++) {
+        var qx = Math.round(px - x0 + t * nx), qy = Math.round(py - y0 + t * ny);
+        if (qx < 1 || qy < 1 || qx >= w - 1 || qy >= h - 1) continue;
+        var gx = gb[qy * w + qx + 1] - gb[qy * w + qx - 1], gy = gb[(qy + 1) * w + qx] - gb[(qy - 1) * w + qx];
+        var v = Math.abs(gx * nx + gy * ny); if (v > best) best = v;
+      }
+      return best;
+    }
+    function score(yc, b) { // mean edge strength over back and front arcs, ignoring the sides
+      var s = 0, n = 0, back = 0, nb = 0;
+      for (var k = 0; k < 72; k++) {
+        var th = (k + 0.5) * Math.PI / 36, c = Math.cos(th), sn = Math.sin(th);
+        if (Math.abs(c) > 0.85) continue;
+        var nx = c / e.a, ny = sn / Math.max(b, 1), nl = Math.hypot(nx, ny), v = edge(e.xc + e.a * c, yc + b * sn, nx / nl, ny / nl);
+        s += v; n++; if (sn < 0) { back += v; nb++; }
+      }
+      return { all: s / n, back: nb ? back / nb : 0 };
+    }
+    var flat = score(e.yc, 0).all, best = null;
+    for (var b = Math.max(3, 0.05 * e.a); b <= 0.45 * e.a; b += 1) {
+      for (var front = e.yc - 0.1 * height; front <= e.yc + 0.02 * height; front += 1) {
+        var yc = front - b; if (yc - b < y0 + 2) continue;
+        var sc = score(yc, b);
+        if (!best || sc.all > best.sc.all) best = { yc: yc, b: b, sc: sc };
+      }
+    }
+    // Keep it only with a clearly stronger outline and a real back edge (not just the front lip).
+    if (best && best.sc.all > 1.3 * flat && best.sc.back > 0.8 * flat) { e.yc = best.yc; e.b = best.b; e.openMouth = true; }
+    return best && { flat: flat, best: best.sc, yc: best.yc, b: best.b };
+  }
+
   // A flat but tilted lip cannot pass the axis-aligned arc residual check.
   // Recover a coherent local line, keeping its width and rejecting painted-band jumps.
   function refineTiltedLip(cv, e, height, minSupport) {
@@ -622,6 +675,7 @@ var RIM2 = (function () {
     // A perspective-based above/below guess was tried and lost on hand-labelled photos (3.9% vs 1.1%).
     top.s = opts.topDir || 1;
     top = scaleE(top, S.sc);
+    if (refine && top.s === 1 && opts.openMouth !== false) recoverOpenMouth(cv, top, height / S.sc);
     if (refine && top.s === 1) refineFrontRim(cv, top, height / S.sc);
     if (refine && opts.tiltedLip !== false) refineTiltedLip(cv, top, height / S.sc, opts.browserFixes === false ? 20 : 18);
     return toB(top, scaleE(bot, S.sc), f.yMin / S.sc, bottomLimit / S.sc);
