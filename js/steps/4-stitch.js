@@ -267,7 +267,19 @@ async function runStitch() {
     await nextFrame(); // let the progress UI paint before the synchronous local solve
     var result = null;
     var tryLocal = /[?&]local=1\b/.test(location.search);
-    try { result = localStitch(); } catch (e) { logMsg("\u2717 local: " + e.message); result = null; }
+    var smt = document.getElementById("seamMergeToggle");
+    if (smt) seamMergeOn = smt.checked;
+    if (seamMergeOn) {
+      try {
+        var t0 = performance.now(), sm = SEAMMERGE.merge(buildRawStrips());
+        if (sm.error) logMsg(t("seamMergeFallback") + sm.error);
+        else {
+          result = sm.canvas;
+          logMsg(t("seamMergeDone") + " (" + Math.round(performance.now() - t0) + " ms, " + t("seamOrder") + sm.order.join(", ") + ")");
+        }
+      } catch (e) { logMsg("\u2717 " + t("seamMergeFallback") + e.message); result = null; }
+    }
+    if (!result) try { result = localStitch(); } catch (e) { logMsg("\u2717 local: " + e.message); result = null; }
     if (result) {
       logMsg(t("localDone") + result.width + "\u00D7" + result.height + "px");
       var ps = document.querySelectorAll("#stitchSteps .p-step"); // relabel: nothing was uploaded

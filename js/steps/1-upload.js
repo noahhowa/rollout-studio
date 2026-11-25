@@ -50,6 +50,25 @@ function tiffToDataURL(buf) {
     return c.toDataURL("image/png");
   });
 }
+// Upload progress: one entry per file until its thumbnail appears. TIFFs can take seconds
+// (decoder download on first use, full-size decode), so each file shows its current stage.
+var pendingUploads = [];
+function setPending(seq, name, stage) {
+  var p = pendingUploads.filter(function (x) { return x.seq === seq; })[0];
+  if (stage == null) pendingUploads = pendingUploads.filter(function (x) { return x.seq !== seq; });
+  else if (p) p.stage = stage;
+  else pendingUploads.push({ seq: seq, name: name, stage: stage });
+  updateUploadStatus();
+}
+function updateUploadStatus() {
+  var el = document.getElementById("upStatus");
+  if (el) {
+    el.style.display = pendingUploads.length ? "flex" : "none";
+    el.querySelector(".up-text").textContent = pendingUploads.map(function (p) { return p.name + ": " + t(p.stage); }).join(" \u00B7 ");
+  }
+  var nb = document.getElementById("btnNext");
+  if (nb) nb.disabled = imgs.length < 2 || pendingUploads.length > 0;
+}
 function doFiles(fs) {
   Array.from(fs).forEach(function (f) {
     if (/\.json$/i.test(f.name)) {
@@ -57,28 +76,42 @@ function doFiles(fs) {
       return;
     }
     var seq = uploadSeq++, r = new FileReader();
+    setPending(seq, f.name, "upReading");
     // TIFF: most browsers can't decode it in <img>, so decode with UTIF.js into a PNG data URL
     // (also keeps sessions reloadable anywhere), then continue down the normal loadSrc path.
     if (isTiff(f)) {
       r.onload = function (e) {
-        tiffToDataURL(e.target.result).then(function (u) {
-          loadSrc(u, seq);
+        var buf = e.target.result;
+        setPending(seq, f.name, window.UTIF ? "upDecoding" : "upDecoder");
+        loadTiffLib().then(function () {
+          setPending(seq, f.name, "upDecoding");
+          return new Promise(function (res) { setTimeout(res, 30); }); // let the status paint
+        }).then(function () { return tiffToDataURL(buf); }).then(function (u) {
+          loadSrc(u, seq, f.name);
         }, function (err) {
+          setPending(seq, null, null);
           alert(t("tiffFailed") + f.name + " (" + (err && err.message || err) + ")");
         });
       };
+      r.onerror = function () { setPending(seq, null, null); alert(t("loadFailed") + f.name); };
       r.readAsArrayBuffer(f);
       return;
     }
     r.onload = function (e) {
-      loadSrc(e.target.result, seq);
+      loadSrc(e.target.result, seq, f.name);
     };
+    r.onerror = function () { setPending(seq, null, null); alert(t("loadFailed") + f.name); };
     r.readAsDataURL(f);
   });
 }
-function loadSrc(src, seq) {
+function loadSrc(src, seq, name) {
   var im = new Image();
+  im.onerror = function () { if (seq != null) setPending(seq, null, null); alert(t("loadFailed") + (name || "")); };
   im.onload = function () {
+    if (seq != null && name) { setPending(seq, name, "upRims"); setTimeout(place, 30); } // paint before the sync detection
+    else place();
+  };
+  function place() {
     var sc = Math.min(1, 1200 / im.width),
       c = document.createElement("canvas");
     c.width = Math.round(im.width * sc);
@@ -96,10 +129,11 @@ function loadSrc(src, seq) {
     while (at > 0 && imgs[at - 1].seq != null && imgs[at - 1].seq > entry.seq) at--;
     imgs.splice(at, 0, entry);
     stripCache = [];
+    if (seq != null) pendingUploads = pendingUploads.filter(function (x) { return x.seq !== seq; });
     renderUpload();
-    document.getElementById("btnNext").disabled = imgs.length < 2;
+    updateUploadStatus();
     document.getElementById("hint").textContent = imgs.length > 0 && imgs.length < 2 ? t("addMin") : "";
-  };
+  }
   im.src = src;
 }
 function saveSession() {
@@ -222,6 +256,13 @@ function renderUpload() {
     doFiles(e.dataTransfer.files);
   };
   el.appendChild(dz);
+  var st = document.createElement("div");
+  st.id = "upStatus";
+  st.className = "up-status";
+  st.setAttribute("role", "status");
+  st.setAttribute("aria-live", "polite");
+  st.innerHTML = '<div class="spinner"></div><span class="up-text"></span>';
+  el.appendChild(st);
   if (imgs.length) {
     var grid = document.createElement("div");
     grid.className = "thumb-grid";
