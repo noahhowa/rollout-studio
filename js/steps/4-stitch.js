@@ -242,8 +242,16 @@ async function runStitch() {
   try {
     setStepState(0, "p-step active");
     setProgress(5);
+    var owt = document.getElementById("overlapWarpToggle");
+    if (owt) overlapWarpOn = owt.checked;
     var strips = buildStrips(),
       N = strips.length;
+    if (overlapWarpReport) {
+      var wr = overlapWarpReport;
+      logMsg(wr.coefficients
+        ? t("overlapWarpApplied") + wr.before.toFixed(2) + "% \u2192 " + wr.after.toFixed(2) + "%"
+        : t("overlapWarpDeclined") + wr.declined);
+    }
     await nextFrame();
     var order = null;
     var aot = document.getElementById("autoOrderToggle");
