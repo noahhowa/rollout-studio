@@ -11,7 +11,7 @@ spec=spec_from_file_location("measure_overlaps", Path(__file__).with_name("measu
 measure=module_from_spec(spec)
 spec.loader.exec_module(measure)
 
-CASES={"lacma-168596":[0,1,2,3],"met-310364":[0,8,3,7,4,6,1,5,2]}
+CASES={"lacma-168596":[0,1,2,3],"lacma-168693":[0,1,2,3],"met-310364":[0,8,3,7,4,6,1,5,2]}
 
 
 def register(api, strip_dir, panorama):
@@ -40,10 +40,15 @@ def locate(api, folder, arm, order, directory):
     return panorama,images,{i:h for i,h in zip(order,ordered)},evidence
 
 
-def overlap_stats(api, folder, arm, order, original):
+def overlap_stats(api, folder, arm, order, original, crop):
     directory=folder/arm if arm!="lower-feather" else folder/"lower-feather"/"adjusted"
     target,images,matrices,evidence=locate(api,folder,arm,order,directory)
-    coeff=np.array(json.loads((folder/'coefficients.json').read_text())['coefficients'])
+    coefficients = None
+    if arm != "baseline":
+        fit = directory / "fit.json"
+        if not fit.is_file():
+            fit = folder / "coefficients.json"
+        coefficients = json.loads(fit.read_text()).get("coefficients")
     edges=measure.fit_adjust.select_edges(original)
     rows=[]
     for i,j in zip(order,order[1:]):
@@ -56,10 +61,10 @@ def overlap_stats(api, folder, arm, order, original):
         W,H=measure.fit_adjust.W,measure.fit_adjust.H
         choose=(abs(p[:,0]-q[:,0]-edge['dx'])<20)&(abs(p[:,1]-q[:,1])<.055*H)
         for xy in (p,q):
-            choose &= (xy[:,0]>=.08*W)&(xy[:,0]<=.92*W)
+            choose &= (xy[:,0]>=crop*W)&(xy[:,0]<=(1-crop)*W)
         p,q=p[choose],q[choose]
-        xy0=measure.points_into_output(p,images[a],matrices[a],.08,coeff[a] if arm!="baseline" else None)
-        xy1=measure.points_into_output(q,images[b],matrices[b],.08,coeff[b] if arm!="baseline" else None)
+        xy0=measure.points_into_output(p,images[a],matrices[a],crop,coefficients[a] if coefficients is not None else None)
+        xy1=measure.points_into_output(q,images[b],matrices[b],crop,coefficients[b] if coefficients is not None else None)
         d=abs(xy0-xy1)
         rows.append({"views":[a,b],"points":len(d),"vertical":float(np.median(d[:,1])),
                      "total":float(np.median(np.linalg.norm(d,axis=1))),
@@ -73,18 +78,26 @@ def main():
     parser.add_argument("source",type=Path)
     parser.add_argument("runs",type=Path)
     parser.add_argument("output",type=Path)
+    parser.add_argument("--crop", type=float, default=.08)
+    parser.add_argument("--case", action="append", choices=CASES, dest="cases")
     args=parser.parse_args()
+    if not 0 <= args.crop < .5:
+        parser.error("crop must be in [0, 0.5)")
     cv2.setRNGSeed(431)
     api=measure.backend_functions(args.source)
     results={}
-    for case,order in CASES.items():
-        folder=args.runs/case
-        paths=sorted((folder/'full').glob('*.png'))
+    for case in args.cases or ("lacma-168596", "met-310364"):
+        order = CASES[case]
+        folder = args.runs / case
+        full = folder / "full"
+        if not full.is_dir():
+            full = folder / "baseline" / "full"
+        paths = sorted(full.glob("*.png"))
         original=[measure.fit_adjust.overlap.source(p) for p in paths]
         result={"photoOrder":[paths[i].stem for i in order],"arms":{}}
         for arm in ("baseline","adjusted","lower-feather"):
             if (folder/(arm+".png")).is_file():
-                result["arms"][arm]=overlap_stats(api,folder,arm,order,original)
+                result["arms"][arm]=overlap_stats(api,folder,arm,order,original,args.crop)
         results[case]=result
     args.output.write_text(json.dumps(results,indent=2)+"\n")
 

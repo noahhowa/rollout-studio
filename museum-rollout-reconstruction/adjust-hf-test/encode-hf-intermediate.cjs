@@ -3,7 +3,7 @@ const { chromium } = require(process.cwd()+"/node_modules/playwright");
 const fs = require("node:fs");
 const [input,output] = process.argv.slice(2);
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL });
   try {
     const page = await browser.newPage();
     const b64 = fs.readFileSync(input).toString("base64");
